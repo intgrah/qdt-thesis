@@ -1,0 +1,25 @@
+= Introduction
+
+== Motivation
+
+Dependently typed languages such as Lean @moura2021lean, Agda @norell2009agda, and Rocq @barras1999coq serve as both programming languages and proof assistants. Unlike ordinary compilers, their type checkers must execute arbitrary programs at compile time --- normalising terms, checking definitional equality, and resolving implicit arguments. This process, called _elaboration_, is the most expensive phase of compilation. In an interactive setting --- where a proof assistant is expected to provide rapid feedback on each keystroke --- re-elaboration latency is a bottleneck.
+
+Existing systems offer limited forms of incrementality. Lean, Agda, and Rocq all support _file-level_ caching: if a file has not changed, its previously compiled result is reused. Within a single file, Lean (since version 4.8) saves snapshots of elaboration state and resumes from the most recent valid checkpoint; Agda's `--caching` flag reuses results for the unchanged prefix of declarations; and coq-lsp re-checks from the first modified sentence onward. All three treat the file as a sequence and reprocess a suffix. If definition 5 of 200 changes, definitions 6 through 200 are re-checked --- even if none of them depend on definition 5.
+
+The central observation is that most of this re-checking is redundant. If one definition changes but its type is unaffected, then definitions that depend only on its type need not be re-checked at all. What is needed is a way to track which results depend on which, and recompute only what has actually been invalidated. Unlike in a conventional compiler, where downstream code depends only on type signatures, a dependently typed elaborator may need to reduce through definition _bodies_ during conversion checking --- so the dependency structure is finer-grained and discovered dynamically during elaboration.
+
+Query-based incrementality has been applied to conventional compilers: rust-analyzer @matklad2020rust_analyzer uses the Salsa framework @salsa2018 to provide incremental type checking for Rust, and the Roslyn compiler does similar work for C\#. In these languages, the compilation boundary is the type signature --- changing a function body without changing its type cannot affect downstream checking. Fredriksson's Sixten (later Sixty) @fredriksson2019sixty is the only prior work to apply query-based incrementality to a dependently typed language. It demonstrates that the approach is viable, but does not formalise the underlying build system or verify that incremental results agree with batch elaboration. No mainstream proof assistant --- Lean, Agda, or Rocq --- uses query-based incrementality.
+
+This is a well-studied problem in a different guise: it is exactly what build systems do. The framework of Mokhov et al. @mokhov2018build shows that build systems such as Make, Shake, and Bazel are instances of a single polymorphic type, parameterised by the class of effects a task is allowed to perform. _Shake_ in particular supports dynamic dependencies --- dependencies discovered during execution rather than declared up front --- and _early cutoff_ --- skipping dependents when a recomputed result is unchanged. These are precisely the properties needed: the elaborator discovers which definitions it must unfold only as it runs, and early cutoff prevents unnecessary re-elaboration when an intermediate result has not changed.
+
+This project applies that framework to elaboration. The elaborator decomposes its work into fine-grained queries --- "what is the type of this constant?", "what are the errors in this definition?" --- each of which is memoised by a Shake-based build system. When a definition changes, only the queries that transitively depend on it are reconsidered; and if the result of a recomputed query is unchanged, its dependents are not recomputed at all. The implementation is written in Lean 4, built on a formalisation of the build system framework in the same language.
+
+== Contributions
+
+- An incremental, query-based elaborator for a dependently typed language, supporting dependent function types, universe polymorphism, and inductive types with recursors --- built on a formalisation of the "Build Systems à la Carte" framework in Lean 4.
+- An evaluation comparing incremental re-elaboration against batch re-elaboration on a standard library.
+
+== Overview
+
+@ch:preparation introduces the background material: the build system framework of Mokhov et al. and our refinements to it, the dependent type theory we implement, bidirectional type checking, normalisation by evaluation, and related work. @ch:implementation describes the elaborator's architecture and each component of the pipeline: parsing, type checking, evaluation, conversion checking, inductive type elaboration, and the incremental build and language server infrastructure. @ch:evaluation presents measurements of correctness, batch elaboration performance, conversion checking speed, and the benefit of incrementality. @ch:conclusion summarises the results and discusses future work.
+
