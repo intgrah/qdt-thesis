@@ -7,9 +7,9 @@
   [*Title*], [Query-based Dependent Type Elaborator],
   [*Examination*], [Computer Science Tripos --- Part II, 2026],
   [*Word Count*],
-  [8,846#footnote[Computed via `typst compile count.typ` and `pdftotext` with the bibliography stripped.]],
+  [8,532#footnote[Computed via `pdftotext` on the main body (Introduction through Conclusion), including code blocks, tables, and captions.]],
 
-  [*Code Line Count*], [10,582#footnote[Computed with `cloc`, excluding `.lake`, references, and stdlib examples.]],
+  [*Code Line Count*], [16,752#footnote[Computed with `cloc --include-lang=Lean,C`, excluding `.lake`, references, and stdlib examples.]],
   [*Project Originator*], [The candidate],
   [*Project Supervisor*], [Dr Jon Sterling],
 )

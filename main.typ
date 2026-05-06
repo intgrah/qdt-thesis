@@ -24,4 +24,6 @@
 
 #bibliography("refs.bib")
 
+#heading(outlined: true, numbering: none)[Appendices]
+
 #include "chapters/06-proposal.typ"

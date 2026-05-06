@@ -44,11 +44,11 @@ abbrev ElabM := ReaderT ElabContext (StateT ElabState (Task Monad config ι₀ q
 
 === Granularity of queries
 
-If queries are too coarse --- one per file --- any edit invalidates the whole file. If they are too fine --- one per expression --- the per-query overhead dominates.
+If queries are too coarse, such as per-file granuality, any edit invalidates the whole file. If they are too fine, per-expression, the per-query overhead dominates.
 
 I chose per-declaration granularity. `Key.elabDecl` elaborates one `def`, `inductive`, or `structure`. Dependent declarations are recomputed only if the edit changes the cached `Constant`.
 
-Finer granularity --- caching individual subterms --- would require treating each subterm as a named entity. This needs either heuristic naming (hashing syntax) or restructuring the theory. Neither is compelling.
+Finer granularity is not particularly compelling, since large terms can be broken into smaller definitions anyway, by the user.
 
 === Dependently-typed query results
 
@@ -63,7 +63,7 @@ def foo : Type 1 := Type
 def bar : Type 1 := foo
 ```
 
-#import "@preview/fletcher:0.5.8": diagram, node, edge
+#import "@preview/fletcher:0.5.8": diagram, edge, node
 
 #figure(
   diagram(
@@ -71,45 +71,35 @@ def bar : Type 1 := foo
     node-fill: rgb("#e8f0fe"),
     node-inset: 5pt,
     node-corner-radius: 3pt,
-    spacing: (10pt, 18pt),
+    spacing: (12pt, 16pt),
 
     node((1, 0), [`text`], fill: rgb("#fce8e6"), name: <text>),
-
     node((1, 1), [`cst`], name: <cst>),
-    edge(<cst>, <text>, "->"),
-
     node((1, 2), [`astSourceMap`], name: <asm>),
+    node((1, 3), [`ast`], name: <ast>),
+    node((1, 4), [`declarationIndex`], name: <di>),
+    node((0, 5), [`elabCmdAt 0`], name: <ec0>),
+    node((2, 5), [`elabCmdAt 1`], name: <ec1>),
+    node((0, 6), [`elabDecl foo`], name: <edf>),
+    node((2, 6), [`elabDecl bar`], name: <edb>),
+    node((0, 7), [`lookup foo`], name: <lf>),
+    node((0, 8), [`constant foo`], name: <cf>),
+
+    edge(<cst>, <text>, "->"),
     edge(<asm>, <cst>, "->"),
-
-    node((0, 3), [`ast`], name: <ast>),
     edge(<ast>, <asm>, "->"),
-
-    node((2, 3), [`declarationIndex`], name: <di>),
     edge(<di>, <ast>, "->"),
-
-    node((-0.5, 4), [`elabCmdAt 0`], name: <ec0>),
     edge(<ec0>, <ast>, "->"),
     edge(<ec0>, <di>, "->"),
-
-    node((2.5, 4), [`elabCmdAt 1`], name: <ec1>),
     edge(<ec1>, <ast>, "->"),
     edge(<ec1>, <di>, "->"),
-
-    node((-0.5, 5), [`elabDecl foo`], name: <edf>),
+    edge(<ec1>, <cf>, "->", bend: 30deg),
     edge(<edf>, <ec0>, "->"),
     edge(<edf>, <di>, "->"),
-
-    node((2.5, 5), [`elabDecl bar`], name: <edb>),
     edge(<edb>, <ec1>, "->"),
     edge(<edb>, <di>, "->"),
-
-    node((1, 6), [`lookup foo`], name: <lf>),
     edge(<lf>, <edf>, "->"),
-
-    node((1, 7), [`constant foo`], name: <cf>),
     edge(<cf>, <lf>, "->"),
-
-    edge(<ec1>, <cf>, "->", bend: 20deg),
   ),
   caption: [
     Query dependency graph for a file with two definitions. Arrows point from a query to its dependencies. The `text` node (red) is the input. Elaborating `bar` depends on `constant foo`, which depends on `elabDecl foo`. Editing `foo`'s body invalidates `elabCmdAt 0`, `elabDecl foo`, `lookup foo`, and `constant foo`; if the resulting `Constant` hashes the same (e.g. the type is unchanged), `elabDecl bar` is not recomputed.

@@ -14,4 +14,4 @@ Several directions remain:
 
 - *Metavariables and implicit arguments.* All terms are currently fully explicit. Pattern unification would make the surface language much more usable.
 - *Parallelism.* The build system's base monad could be instantiated with IO for parallel query evaluation, elaborating independent queries concurrently.
-- *Cancellation.* A language server should cancel in-progress elaboration when the user edits again. The middleware framework could support this via an exception monad preserving partial progress.
+- *Cancellation.* A language server should cancel in-progress elaboration when the user edits again. The a framework that supported "middleware" could support this via an exception monad preserving partial progress.

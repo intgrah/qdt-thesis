@@ -1,6 +1,6 @@
 == Normalisation by evaluation <sec:nbe>
 
-#import "@preview/fletcher:0.5.8": diagram, node, edge
+#import "@preview/fletcher:0.5.8": diagram, edge, node
 
 #figure(
   diagram(
@@ -24,7 +24,7 @@
 
 === Semantic domain
 
-Values (`VTm`, `VTy`) represent terms in weak head normal form, using de Bruijn _levels_ rather than indices:
+Values (`VTm`, `VTy`) represent terms in weak head normal form, using de Bruijn _levels_ @debruijn1972lambda rather than indices:
 
 ```lean
 inductive VTm : Nat → Type
@@ -73,8 +73,8 @@ Constants evaluate to _glued_ values when a definition exists, carrying the fold
 
 `VTm.whnf` reduces until the outermost form is canonical (lambda, Pi, universe) or irreducible (variable-headed neutral):
 
-- *Delta-reduction*: when the head is a defined constant, `whnf` fetches the definition body, evaluates it with the appropriate universe substitution, and re-applies the spine. This is the only point at which a body is materialised --- evaluation merely records name and universes in the glued value.
-- *Iota-reduction*: when a fully-applied recursor has a constructor as its major premise, `whnf` substitutes the constructor's fields into the minor premise.
+- *$delta$-reduction*: when the head is a defined constant, `whnf` fetches the definition body, evaluates it with the appropriate universe substitution, and re-applies the spine. This is the only point at which a body is materialised --- evaluation merely records name and universes in the glued value.
+- *$iota$-reduction*: when a fully-applied recursor has a constructor as its major premise, `whnf` substitutes the constructor's fields into the minor premise.
 
 A glued value that is never forced --- because the conversion checker matched it in flex mode --- never triggers a fetch of the definition body.
 

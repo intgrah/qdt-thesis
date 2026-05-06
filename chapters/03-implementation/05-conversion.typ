@@ -15,20 +15,19 @@ The algorithm here, from Kovacs's smalltt @kovacs2023smalltt, bounds speculative
 #figure(
   diagram(
     node-stroke: 0.5pt,
-    node-inset: 6pt,
+    node-inset: 8pt,
     node-corner-radius: 3pt,
-    spacing: (30pt, 20pt),
+    spacing: (60pt, 40pt),
 
     node((0, 0), [`rigid`], fill: rgb("#e8f0fe"), name: <rigid>),
     node((2, 0), [`flex`], fill: rgb("#fef7e0"), name: <flex>),
-    node((1, 1), [`full`], fill: rgb("#fce8e6"), name: <full>),
+    node((0, 1), [`full`], fill: rgb("#fce8e6"), name: <full>),
 
     edge(<rigid>, <flex>, "->", label: [same head], label-side: left),
-    edge(<flex>, <rigid>, "-->", label: [mismatch], label-side: left, bend: 20deg),
-    edge(<rigid>, <full>, "->", label: [flex failed / different heads], label-side: left),
-    edge(<full>, <full>, "->", bend: 130deg, label: [stays]),
+    edge(<flex>, <rigid>, "-->", label: [fail], label-side: left, bend: 20deg),
+    edge(<rigid>, <full>, "->", label: [heads differ], label-side: left),
   ),
-  caption: [Conversion checking state transitions. Rigid speculatively tries flex; on failure it commits to full.],
+  caption: [Conversion state transitions. Rigid speculatively tries flex on matching heads; on failure it falls back to full, which unfolds eagerly.],
 ) <fig:conv-states>
 
 Consider comparing `f (g (h x))` with itself, where `f`, `g`, `h` are top-level definitions. The naive algorithm unfolds all three on both sides --- potentially exponential. The approximate algorithm observes the same folded structure: same head `f`, same spine. Flex descends into the argument, sees `g`, then `h`, bottoming out at `x` with no unfolding. The check runs in time proportional to the folded term, not the unfolded one.

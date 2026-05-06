@@ -1,6 +1,6 @@
 == Bidirectional type checking <sec:bidirectional>
 
-Type checking is bidirectional. Rather than a single judgement $Gamma tack.r t : A$, the algorithm splits into two mutually recursive functions:
+Type checking is bidirectional @dunfield2021bidirectional. Rather than a single judgement $Gamma tack.r t : A$, the algorithm splits into two mutually recursive functions:
 
 - `inferTm ctx ast : OptionT ElabM (Tm n × VTy n)` --- synthesise a core term and its type. Used when the expected type is unknown.
 - `checkTm ctx expectedTy ast : ElabM (Tm n)` --- produce a core term at a known expected type. On failure, a diagnostic is emitted and a fresh axiom inserted as placeholder.

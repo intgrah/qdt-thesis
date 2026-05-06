@@ -1,12 +1,12 @@
 == Parsing <sec:parsing>
 
-The parser is a hand-rolled recursive descent Pratt parser, implemented as monadic combinators over `StateT State (Except ParseError)`. Source text is first parsed to a concrete syntax tree (`Cst`) retaining trivia and exact token widths, then desugared to an abstract syntax tree (`Ast`) that strips trivia and expands surface syntax.
+The parser is a hand-rolled recursive descent Pratt parser @pratt1973top, implemented as monadic combinators over `StateT State (Except ParseError)`. Source text is first parsed to a concrete syntax tree (`Cst`) retaining trivia and exact token widths, then desugared to an abstract syntax tree (`Ast`) that strips trivia and expands surface syntax.
 
 The parser itself is unremarkable . The interesting choice is the CST representation.
 
 === Green trees
 
-The CST follows the _green tree_ pattern (Roslyn, rust-analyzer). Nodes and tokens are tagged by `SyntaxNodeKind`; positions are not stored:
+The CST follows the _green tree_ pattern @roslyn2015 @matklad2020rust_analyzer. Nodes and tokens are tagged by `SyntaxNodeKind`; positions are not stored:
 
 ```lean
 inductive Cst : Type
@@ -41,7 +41,9 @@ structure SourceMap where
   astToCst : HashMap Path Path
 ```
 
-The map is populated during desugaring. The language server uses it in both directions:
+The map is populated during desugaring. The language
+
+The language server uses it in both directions:
 
 - _Hover_: walk the CST to find the path under the cursor, then `cstToAst` gives the AST path. Hover content is keyed by AST path.
 - _Diagnostics_: recorded at CST paths, mapped back via `astToCst`, then converted to source spans by summing widths.

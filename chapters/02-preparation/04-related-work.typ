@@ -6,7 +6,7 @@ Kovacs's _smalltt_ @kovacs2023smalltt combines higher-order abstract syntax, glu
 
 === Lean 4
 
-Lean 4 @moura2021lean is the primary reference for surface language and inductive types. Our elaborator supports the same declaration forms (`def`, `inductive`, `structure`, `axiom`) and recursor-based elimination. The core theory departs from Lean's kernel in using Tarski-style universes and omitting metavariables and implicit arguments.
+Lean 4 @moura2021lean is the primary reference for surface language and inductive types. Our elaborator supports the same declaration forms (`def`, `inductive`, `structure`, `axiom`) and recursor-based elimination. The core theory departs from Lean's kernel in using Tarski-style universes and omitting metavariables and implicit arguments. The metatheory also differs, as we opt for predicative universes, rather than the impredicative Calculus of Constructions.
 
 === Self-adjusting computation and Adapton
 
