@@ -9,7 +9,7 @@
   [*Word Count*],
   [8,532#footnote[Computed via `pdftotext` on the main body (Introduction through Conclusion), including code blocks, tables, and captions.]],
 
-  [*Code Line Count*], [16,752#footnote[Computed with `cloc --include-lang=Lean,C`, excluding `.lake`, references, and stdlib examples.]],
+  [*Code Line Count*], [15,774#footnote[Computed with `cloc`.]],
   [*Project Originator*], [The candidate],
   [*Project Supervisor*], [Dr Jon Sterling],
 )

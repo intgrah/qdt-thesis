@@ -34,6 +34,13 @@
         }
         v(0.5em)
         it.body
+      } else if it.numbering == "A.1" {
+        "Appendix "
+        context {
+          str(numbering("A", counter(heading).get().first()))
+        }
+        v(0.5em)
+        it.body
       } else {
         it
       }

@@ -1,4 +1,4 @@
-#heading(outlined: false, numbering: none)[Project Proposal]
+= Project Proposal
 
 *Query-based Incremental Elaborator for a Dependently Typed Language*
 

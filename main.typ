@@ -26,4 +26,8 @@
 
 #heading(outlined: true, numbering: none)[Appendices]
 
+#set heading(numbering: "A.1", outlined: false)
+#counter(heading).update(0)
+#show heading.where(level: 1): set heading(outlined: true)
+
 #include "chapters/06-proposal.typ"

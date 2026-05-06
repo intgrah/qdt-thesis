@@ -52,7 +52,7 @@ Finer granularity is not particularly compelling, since large terms can be broke
 
 === Dependently-typed query results
 
-The dependent `Val : Key → Type` lets `fetch (Key.constant p n) : Task (Option Constant)` type-check without tagging --- the compiler specialises each call site. The alternative is a sum type (boilerplate matching at every consumer) or existential (`unsafeCast` at every fetch). Haskell's Rock and Salsa approximate this with singleton types or type families.
+The dependent `Val : Key → Type` lets `fetch (Key.constant p n) : Task (Option Constant)` type-check without tagging --- the compiler specialises each call site. The alternatives are a sum type (boilerplate matching at every consumer), an existential (`unsafeCast` at every fetch), or GADTs (where an index on the key type determines the result type, as in Rock and Salsa). Dependent types express this directly.
 
 === Query dependency graph
 
