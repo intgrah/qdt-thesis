@@ -16,10 +16,12 @@
   logo: "cst_logo.svg",
 )
 
-#include "chapters/01-introduction.typ"
-#include "chapters/02-preparation.typ"
-#include "chapters/03-implementation.typ"
+#include "chapters/01-introduction/00-main.typ"
+#include "chapters/02-preparation/00-main.typ"
+#include "chapters/03-implementation/00-main.typ"
 #include "chapters/04-evaluation.typ"
 #include "chapters/05-conclusion.typ"
 
 #bibliography("refs.bib")
+
+#include "chapters/06-proposal.typ"

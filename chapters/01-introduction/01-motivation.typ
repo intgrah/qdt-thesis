@@ -1,0 +1,10 @@
+== Motivation
+
+A dependently typed elaborator runs programs during compilation. When a definition changes, the elaborator must re-check not just the definitions that mention it, but potentially any definition whose type checking required reducing through its body. In current proof assistants --- Lean @moura2021lean, Agda @norell2009agda, Rocq @barras1999coq --- this means re-checking everything from the edit point onward. In an interactive setting, where the user expects rapid feedback on each keystroke, this re-elaboration latency is a bottleneck.
+
+Existing systems offer limited forms of incrementality. Lean, Agda, and Rocq all support _file-level_ caching: if a file has not changed, its previously compiled result is reused. Within a single file, Lean 4 saves snapshots of elaboration state and resumes from the most recent valid checkpoint; Agda caches type-checking results per declaration and reuses them when the declaration and its dependencies are unchanged; and coq-lsp re-checks from the first modified sentence onward. All three treat the file as a sequence and reprocess a suffix. If definition 5 of 200 changes, definitions 6 through 200 are re-checked --- even if none of them depend on definition 5.
+
+In practice, a user working interactively --- editing a lemma, fixing a definition, exploring a proof --- expects feedback within a few hundred milliseconds. When an edit triggers re-elaboration of an entire file, the delay can reach tens of seconds in large developments. The user waits, loses context, and must re-orient after each edit.
+
+Most of this re-checking is redundant. If one definition changes but its type is unaffected, definitions that depend only on its type need not be re-checked. We need a way to track which results depend on which, and recompute only what has been invalidated. Unlike in a conventional compiler, where downstream code depends only on type signatures, a dependently typed elaborator may reduce through definition _bodies_ during conversion checking. The dependency structure is finer-grained and discovered dynamically.
+

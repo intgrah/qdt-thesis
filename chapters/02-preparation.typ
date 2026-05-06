@@ -282,7 +282,7 @@ A naive incremental system that invalidates everything after the edit point (as 
 
 === Existing approaches
 
-Existing proof assistants offer limited incrementality. Lean (since version 4.8) saves snapshots of elaboration state and resumes from the most recent valid checkpoint before an edit. Agda's `--caching` flag reuses results for the unchanged prefix of declarations in interactive mode. coq-lsp re-checks from the first modified sentence onward. All three treat the file as a sequence and reprocess a suffix: if definition 5 of 200 changes, definitions 6 through 200 are re-checked, regardless of whether they depend on definition 5.
+Existing proof assistants offer limited incrementality. Lean 4 saves snapshots of elaboration state and resumes from the most recent valid checkpoint before an edit. Agda's `--caching` flag reuses results for the unchanged prefix of declarations in interactive mode. coq-lsp re-checks from the first modified sentence onward. All three treat the file as a sequence and reprocess a suffix: if definition 5 of 200 changes, definitions 6 through 200 are re-checked, regardless of whether they depend on definition 5.
 
 For conventional languages, query-based incrementality is well-established. Rust-analyzer uses Salsa @salsa2018, a framework that tracks dependencies between queries and uses early cutoff to avoid recomputation when results are unchanged. The key property that makes this work for Rust is the clean separation between signatures and bodies: changing a function body without changing its type cannot affect downstream type checking, so downstream queries are never invalidated.
 

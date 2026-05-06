@@ -15,6 +15,11 @@
   set page(numbering: "1", number-align: center)
   set text(font: "New Computer Modern", lang: "en")
   show math.equation: set text(weight: 400)
+  set raw(theme: "theme.tmTheme")
+  show raw: set text(font: "FiraCode Nerd Font", size: 9pt)
+  show raw.where(block: true): set block(fill: luma(248), inset: 8pt, radius: 3pt, width: 100%)
+  set table(stroke: none)
+  show table: set table(stroke: (x, y) => if y == 0 { (bottom: 0.5pt) })
   set heading(numbering: "1.1")
 
   show heading: it => {
