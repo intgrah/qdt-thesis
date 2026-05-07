@@ -30,9 +30,9 @@ The algorithm here, from Kovacs's smalltt @kovacs2023smalltt, bounds speculative
   caption: [Conversion state transitions. Rigid speculatively tries flex on matching heads; on failure it falls back to full, which unfolds eagerly.],
 ) <fig:conv-states>
 
-Consider comparing `f (g (h x))` with itself, where `f`, `g`, `h` are top-level definitions. The naive algorithm unfolds all three on both sides --- potentially exponential. The approximate algorithm observes the same folded structure: same head `f`, same spine. Flex descends into the argument, sees `g`, then `h`, bottoming out at `x` with no unfolding. The check runs in time proportional to the folded term, not the unfolded one.
+Consider comparing `f (g (h x))` with itself, where `f`, `g`, `h` are top-level definitions. The naive algorithm unfolds all three on both sides. The approximate algorithm observes the same folded structure: same head `f`, same spine. Flex descends into the argument, sees `g`, then `h`, bottoming out at `x` with no unfolding. The check runs in time proportional to the folded term, not the unfolded one.
 
 For eta-conversion: function eta opens both sides at a fresh variable and compares bodies; structure eta compares each projection $s.i$ with the corresponding field $r_i$ of $c(r_1, dots, r_k)$.
 
-An alternative is _on-the-fly_ reduction: whnf each side just enough to decide equality, recurse under binders. This avoids full normal forms, but without the rigid/flex distinction it still unfolds aggressively whenever heads differ syntactically. The speculative flex check avoids this in the common case of matching defined heads.
+An alternative, used in Lean's `isDefEq` and Agda's conversion checker, is _on-the-fly_ reduction: whnf each side just enough to decide equality, recurse under binders. This avoids full normal forms, but without the rigid/flex distinction it unfolds whenever heads differ syntactically. The speculative flex check avoids this in the common case of matching defined heads.
 

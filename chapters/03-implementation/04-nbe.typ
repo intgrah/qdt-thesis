@@ -43,7 +43,7 @@ NbE frequently _weakens_ values --- embedding them into a larger scope when a cl
 
 === Closures
 
-Closures are defunctionalised: a lambda carries its body as syntax paired with the captured environment, rather than a host-language function `VTm -> VTm` (HOAS). HOAS is faster @kovacs2023smalltt but requires a non-strictly-positive inductive (`lam : (VTm -> VTm) -> VTm`), which Lean's kernel rejects. Defunctionalisation keeps the evaluator within the logic.
+Closures are defunctionalised: a lambda carries its body as syntax paired with the captured environment, rather than a host-language function `VTm -> VTm` (HOAS). HOAS is expected to be faster because the host compiler optimises the closure to a native function call, but it requires a non-strictly-positive inductive (`lam : (VTm -> VTm) -> VTm`), which Lean's kernel rejects. Defunctionalisation keeps the evaluator within the logic.
 
 === Evaluation
 

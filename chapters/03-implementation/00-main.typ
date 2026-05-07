@@ -12,3 +12,4 @@ The implementation is written in Lean 4. Lean is designed as a general-purpose p
 #include "06-inductive.typ"
 #include "07-incremental.typ"
 #include "08-lsp.typ"
+#include "09-verification.typ"

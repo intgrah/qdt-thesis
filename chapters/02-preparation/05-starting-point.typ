@@ -6,7 +6,7 @@ The elaborator was built in three phases: a batch elaborator for the core theory
 
 The codebase is in Git with GitHub as the remote. The dissertation is a separate Typst repository.
 
-The primary correctness test is the standard library: 2,200 lines across 36 files, re-elaborated from scratch on every run. Equality proofs serve as integration tests for the conversion checker. A test harness (`Qdt/Lsp/Test.lean`) simulates editor interactions --- setting file contents, triggering rebuilds, asserting on diagnostics and hovers --- covering pathological incremental scenarios (swapping definitions, renaming, moving between files). Additional suites include Church-encoded normalisation benchmarks and a port of the Lean 2 HoTT library.
+The primary correctness test is the standard library: 2,300 lines across 39 files, re-elaborated from scratch on every run. Equality proofs serve as integration tests for the conversion checker. A test harness (`Qdt/Lsp/Test.lean`) simulates editor interactions --- setting file contents, triggering rebuilds, asserting on diagnostics and hovers --- covering pathological incremental scenarios (swapping definitions, renaming, moving between files). Additional suites include Church-encoded normalisation benchmarks and a port of the Lean 2 HoTT library.
 
 The build system's correctness proofs (Busy, LessBusy, Shake) replace testing of the incremental layer: any inhabitant of `Build` is correct by construction.
 

@@ -2,9 +2,9 @@
 
 The parser is a hand-rolled recursive descent Pratt parser @pratt1973top, implemented as monadic combinators over `StateT State (Except ParseError)`. Source text is first parsed to a concrete syntax tree (`Cst`) retaining trivia and exact token widths, then desugared to an abstract syntax tree (`Ast`) that strips trivia and expands surface syntax.
 
-The parser itself is unremarkable . The interesting choice is the CST representation.
-
 === Green trees
+
+#import "@preview/fletcher:0.5.8": diagram, node, edge
 
 The CST follows the _green tree_ pattern @roslyn2015 @matklad2020rust_analyzer. Nodes and tokens are tagged by `SyntaxNodeKind`; positions are not stored:
 
@@ -19,21 +19,90 @@ with
     | .node _ children => children.map width |>.sum
 ```
 
-For example, `def foo := Type` produces the tree:
+Each token stores its text _including adjacent whitespace_. Nodes store only their kind and children --- no absolute positions. Positions are recovered on demand by summing widths from the root. Because nodes lack positions, two identical subtrees are structurally equal regardless of where they appear in the file, making the CST `Hashable`.
 
-```
-node Command.definition ["def " | "foo" | " := " | "Type"]
-```
+This matters for incrementality in two ways: green trees absorb whitespace edits within a definition, and relative paths absorb insertions before a definition.
 
-Each token stores its text including adjacent whitespace. No absolute positions --- these are recovered by summing widths from the root. Because nodes lack positions, identical subtrees are structurally equal regardless of location, making the CST `Hashable`. The build system can short-circuit recomputation when an edit does not affect a subtree.
+==== Whitespace edits
 
-If two spaces are inserted at the start of the file, only the first token changes (`"def "` becomes `"  def "`). The rest are structurally identical, so the AST (which discards trivia) hashes the same and no downstream query is invalidated. Without green trees, any whitespace edit would shift absolute positions throughout the file, invalidating every query.
+Consider the definition `def foo := Type`, which produces the CST:
 
-The pipeline works with AST _paths_ (lists of child indices from the root), not source positions. Diagnostics and hovers are keyed by path, so elaboration results are independent of where a definition sits in the file. Positions are reconstructed on demand for the language server.
+#figure(
+  diagram(
+    node-stroke: 0.5pt,
+    node-inset: 5pt,
+    node-corner-radius: 3pt,
+    spacing: (10pt, 14pt),
+
+    node((1, 0), [`definition`], fill: rgb("#e8f0fe"), name: <root>),
+    node((0, 1), [`"def·"`], fill: rgb("#f0f0f0"), name: <def>),
+    node((0.67, 1), [`"foo"`], fill: rgb("#f0f0f0"), name: <foo>),
+    node((1.33, 1), [`"·:=·"`], fill: rgb("#f0f0f0"), name: <col>),
+    node((2, 1), [`"Type"`], fill: rgb("#f0f0f0"), name: <ty>),
+
+    edge(<root>, <def>, "->"),
+    edge(<root>, <foo>, "->"),
+    edge(<root>, <col>, "->"),
+    edge(<root>, <ty>, "->"),
+  ),
+  caption: [CST for `def foo := Type`. Each token includes adjacent whitespace (shown as `·`). The `definition` node stores no position.],
+) <fig:cst-example>
+
+If the user changes this to `def foo      := Type` (extra spaces), only the `":=·"` token changes --- it becomes `"·····:=·"`. The other three tokens (`"def·"`, `"foo"`, `"Type"`) are structurally identical. The AST, which discards whitespace during desugaring, hashes the same as before. No downstream query is invalidated.
+
+Without green trees, each node would store its absolute byte offset. Adding five spaces would shift the positions of `":= "` and `"Type"`, producing a structurally different tree. Every query that depends on the CST --- the AST, the elaboration, the diagnostics --- would see a different hash and recompute, despite the source code being semantically identical.
+
+==== Relative paths and insertion
+
+The elaboration pipeline uses _paths_ --- lists of child indices relative to a subtree root --- rather than absolute positions or absolute indices from the file root. A path `[2, 1]` means "child 2 of the subtree, then child 1 of that". Diagnostics and hovers are keyed by path relative to the declaration's subtree.
+
+This means that inserting a new definition _before_ `foo` does not invalidate `foo`'s elaboration. Consider a file with two definitions:
+
+#figure(
+  diagram(
+    node-stroke: 0.5pt,
+    node-inset: 5pt,
+    node-corner-radius: 3pt,
+    spacing: (8pt, 14pt),
+
+    node((1, 0), [`file`], fill: rgb("#e8f0fe"), name: <file>),
+    node((0, 1), [`def bar ...`], fill: rgb("#e6f4ea"), name: <bar>),
+    node((2, 1), [`def foo ...`], fill: rgb("#e6f4ea"), name: <foo>),
+
+    edge(<file>, <bar>, "->", label: [`[0]`]),
+    edge(<file>, <foo>, "->", label: [`[1]`]),
+  ),
+  caption: [`foo` is at absolute index `[1]` in the file.],
+)
+
+If a new definition `baz` is inserted before `foo`:
+
+#figure(
+  diagram(
+    node-stroke: 0.5pt,
+    node-inset: 5pt,
+    node-corner-radius: 3pt,
+    spacing: (8pt, 14pt),
+
+    node((1, 0), [`file`], fill: rgb("#e8f0fe"), name: <file>),
+    node((-0.5, 1), [`def bar ...`], fill: rgb("#e6f4ea"), name: <bar>),
+    node((1, 1), [`def baz ...`], fill: rgb("#fce8e6"), name: <baz>),
+    node((2.5, 1), [`def foo ...`], fill: rgb("#e6f4ea"), name: <foo>),
+
+    edge(<file>, <bar>, "->", label: [`[0]`]),
+    edge(<file>, <baz>, "->", label: [`[1]`]),
+    edge(<file>, <foo>, "->", label: [`[2]`]),
+  ),
+  caption: [`foo` is now at absolute index `[2]`, but its subtree is unchanged.],
+)
+
+`foo`'s absolute index changed from `[1]` to `[2]`, but the subtree rooted at `foo` is structurally identical --- same tokens, same children, same widths. The `declarationIndex` query (which maps names to indices) recomputes, but `foo`'s green tree subtree hashes the same as before, so `elabDecl foo` is not recomputed. Only `baz` is elaborated.
+
+If paths were absolute from the file root, every diagnostic and hover inside `foo` would shift from `[1, ...]` to `[2, ...]`, producing different hashes and forcing recomputation of `foo` and all subsequent definitions.
 
 === Language server integration
 
-Alongside the CST, parsing produces a `SourceMap` that bidriectionally maps paths in the CST to paths in the AST. A _path_ is a list of child indices from the root. In the tree above, the token `"foo"` has path `[1]` (the second child of the root node), and `" := "` has path `[2]`. In a file with two definitions, the identifier in the second definition might have path `[1, 1]` (second child of root, then second child of that node). The bidirectional map is:
+Alongside the CST, parsing produces a `SourceMap` that bidirectionally maps paths in the CST to paths in the AST:
 
 ```lean
 structure SourceMap where
@@ -41,14 +110,12 @@ structure SourceMap where
   astToCst : HashMap Path Path
 ```
 
-The map is populated during desugaring. The language
+The map is populated during desugaring: as each AST node is constructed from a CST node, an entry is added to both tables. The language server uses it in both directions:
 
-The language server uses it in both directions:
+- _Hover_: given a cursor position, the CST is walked to find the path of the token under the cursor. `cstToAst` maps this to the AST path. Hover content is keyed by AST path, so the lookup is direct.
+- _Diagnostics_: the elaborator records diagnostics at AST paths. `astToCst` maps these back to CST paths, which are converted to source spans by summing widths from the root.
 
-- _Hover_: walk the CST to find the path under the cursor, then `cstToAst` gives the AST path. Hover content is keyed by AST path.
-- _Diagnostics_: recorded at CST paths, mapped back via `astToCst`, then converted to source spans by summing widths.
-
-Path-based lookup is $O("depth")$ rather than $O("size")$.
+Source positions are reconstructed only at this final step --- the entire elaboration pipeline operates on paths, never on byte offsets. Path-based lookup is $O("depth")$ rather than $O("size")$.
 
 === Error recovery
 
