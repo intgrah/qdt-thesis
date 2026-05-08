@@ -1,4 +1,4 @@
-== Formal verification
+== Formal verification <sec:verification>
 
 The build system framework is formalised in Lean 4 with machine-checked proofs. We refine the "Build Systems à la Carte" (BSALC) framework @mokhov2018build in three ways, each forced by the requirements of a dependently typed elaborator.
 
@@ -8,9 +8,13 @@ BSALC uses a single key type `k` with a uniform value type `v`. A type checker n
 
 $ V : I -> "Type", quad R : Q -> "Type" $
 
-BSALC does not address termination --- the Haskell implementation simply assumes tasks do not cycle. For a total specification we need a well-foundedness condition. The dependency relation is indexed by the current input state, because different source files can induce different dependency orders among queries:
+BSALC does not address termination: the Haskell implementation simply assumes tasks do not cycle. For a total specification we need a well-foundedness condition. The dependency relation is indexed by the current input state, because different source files can induce different dependency orders among queries:
 
-$ sans("rel") : (Pi_i V(i)) -> Q -> Q -> sans("Prop"), quad sans("wf") : forall iota. sans("WellFounded")(sans("rel")_iota) $
+TODO: No it isn't
+
+$
+  sans("rel") : (Pi_i V(i)) -> Q -> Q -> sans("Prop"), quad sans("wf") : forall iota. sans("WellFounded")(sans("rel")_iota)
+$
 
 These are bundled into a configuration:
 
@@ -21,6 +25,8 @@ structure BuildConfig : Type 1 where
   rel : (∀ i, V i) → Q → Q → Prop
   wf : ∀ ι, WellFounded (rel ι)
 ```
+
+TODO: fix
 
 A task for query $q_0$ under input state $iota_0$ is polymorphic in an effect $f$. It receives two callbacks: one to read inputs, one to fetch query results. The fetch callback requires a proof that the fetched query precedes $q_0$ in the dependency relation:
 
@@ -36,7 +42,7 @@ The polymorphism in $f$ is the key design: the elaborator's tasks are written on
 
 === Correctness
 
-A correct build system produces the same result as `compute`, a reference semantics defined by well-founded recursion. `compute` runs each task in `Id` (the trivial monad --- no effects), recursively recomputing every dependency from scratch without memoisation:
+A correct build system produces the same result as `compute`, a reference semantics defined by well-founded recursion. `compute` runs each task in `Id` (the trivial monad, no effects), recursively recomputing every dependency from scratch:
 
 ```lean
 def compute (tasks : Tasks c ℭ) (ι : ∀ i, ℭ.V i) (q : ℭ.Q) : ℭ.R q :=
@@ -55,9 +61,9 @@ structure Build (c) (ℭ : BuildConfig) (J : Type) [Input ℭ J] where
       { r : ℭ.R q // r = compute tasks (inputs store) q } × σ
 ```
 
-Any inhabitant is correct by construction. Three build systems inhabit this type:
+Any inhabitant is correct by construction. The elaborator's `tasks` value is defined once and works with any `Build` inhabitant. This separation means the build strategy can be swapped without touching the elaborator: one can use a verified Lean implementation during development and a fast C implementation in production, confident that both compute the same results. Three build systems inhabit this type:
 
-*Busy* calls `compute` directly. Correctness is by definition --- the returned value is `compute`'s output.
+*Busy* calls `compute` directly. Correctness follows by definition.
 
 ```lean
 def Busy : Build c ℭ J where
@@ -67,9 +73,9 @@ def Busy : Build c ℭ J where
 
 === The free theorem <sec:free-theorem>
 
-LessBusy and Shake run tasks in `StateM Cache`, a monad threading a mutable cache of previously computed results. But correctness is stated against `compute`, which runs tasks in `Id` (the trivial monad with no effects). The free theorem establishes that a task produces the same result in both monads, provided the fetches return the same values.
+LessBusy and Shake run tasks in `StateM Cache`, a monad threading a cache of previously computed results. However correctness is stated against `compute`, which runs tasks in `Id` (the trivial monad with no effects). The free theorem establishes that a task produces the same result in both monads, provided the fetches return the same values.
 
-The argument is parametricity. A function of type `∀ a, List a → List a` can only rearrange, duplicate, or drop elements --- it cannot inspect them, because `a` is abstract. This forces it to commute with `map`: whatever positions it selects, it selects the same way regardless of what occupies them. A `Task` is polymorphic in its monad in the same way: it can only sequence fetches and combine results, never inspect which monad it runs in. If the fetches return the same values in both monads, the task produces the same final result.
+We argue for the correctness of these build systems via _parametricity_ (Wadler @wadler1989theorems). For example, a function of type `∀ a, List a → List a` can only rearrange, duplicate, or drop elements --- it cannot inspect them, because `a` is abstract. This forces it to commute with `map`: whatever positions it selects, it selects the same way regardless of what occupies them. A `Task` is polymorphic in its monad in the same way: it can only sequence fetches and combine results, never inspect which monad it runs in. If the fetches return the same values in both monads, the task produces the same final result.
 
 To formalise this, we define a `MonadAction` relating two monads --- a family of relations on their carrier types, preserving `pure` and `>>=`:
 
@@ -90,13 +96,13 @@ axiom Task.freeTheorem :
     F.rel Eq (t κ₁ ι₁ fetch₁) (t κ₂ ι₂ fetch₂)
 ```
 
-Parametricity cannot be proved internally in Lean; it is stated as an axiom. The axiom is incompatible with `Classical.choice`; the formalisation avoids choice throughout.
+Since `Task` is polymorphic in a type constructor `f` constrained by `Monad`, this requires higher-kinded parametricity (Voigtländer @voigtlander2009free). Parametricity cannot be proved internally in Lean; it is stated as an axiom. The axiom is incompatible with `Classical.choice`; the formalisation avoids choice throughout.
 
 From the axiom, we derive `Tasks.freeTheorem`: specialising to `κ₁ := StateM Cache` and `κ₂ := Id`, if the cache provides the same values as `compute` for every fetch, the overall task result equals `compute`. The proof unfolds `compute` once and applies the axiom.
 
 === LessBusy
 
-Busy recomputes every dependency from scratch --- exponential in the depth of the dependency graph. LessBusy avoids this by caching results within a single build, so each query is computed at most once. Each cache entry is a dependent pair `{ r : ℭ.R q // r = compute tasks ι q }` --- a value with its correctness proof. The `fetch` function checks the cache first; on a miss, it runs the task, caches the result, and returns it:
+Busy recomputes every dependency from scratch, exponential in the depth of the dependency graph. LessBusy avoids this by caching results within a single build, so each query is computed at most once. Each cache entry is a dependent pair `{ r : ℭ.R q // r = compute tasks ι q }`, bundling a value with its correctness proof. The `fetch` function checks the cache first; on a miss, it runs the task, caches the result, and returns it:
 
 ```lean
 def fetch (q₀ : ℭ.Q) :
@@ -108,7 +114,7 @@ def fetch (q₀ : ℭ.Q) :
 termination_by ℭ.wf.wrap q₀
 ```
 
-Termination follows from the well-founded relation: each recursive `fetch` call provides a proof `ℭ.rel q' q₀`, so the recursion decreases. The `run` function executes the task and produces a proven `Value` --- this is where the free theorem is used.
+Termination follows from the well-founded relation: each recursive `fetch` call provides a proof `ℭ.rel q' q₀`, so the recursion decreases. The `run` function executes the task and produces a proven `Value`; this is where the free theorem is used.
 
 The proof constructs a concrete `MonadAction (StateM VCache) Id`:
 
@@ -133,7 +139,7 @@ The empty cache is passed as the initial state. Each `fetch` call populates it, 
 
 === Shake
 
-LessBusy starts fresh on each build --- the cache is discarded between invocations. This is the gap Shake fills: it persists the cache across builds, using fingerprints to determine which entries are still valid. Each cached `Memo` carries a universally quantified invariant:
+LessBusy starts fresh on each build; the cache is discarded between invocations. Shake fills this gap by persisting the cache across builds, using fingerprints to determine which entries are still valid. Each cached `Memo` carries a universally quantified invariant:
 
 ```lean
 structure Memo (q : ℭ.Q) where
@@ -147,12 +153,12 @@ structure Memo (q : ℭ.Q) where
       value = compute tasks ι q
 ```
 
-The invariant says: for _any_ input function `ι`, if every recorded input fingerprint matches `ι` and every recorded dependency fingerprint matches `compute` under `ι`, then `value` equals `compute tasks ι q`. This is universally quantified over `ι` --- the same memo is valid across builds with different inputs, as long as the fingerprints match.
+The invariant says: for _any_ input function `ι`, if every recorded input fingerprint matches `ι` and every recorded dependency fingerprint matches `compute` under `ι`, then `value` equals `compute tasks ι q`. This is universally quantified over `ι`: the same memo is valid across builds with different inputs, as long as the fingerprints match.
 
 On a cache hit, `verifyInputs` checks each recorded input fingerprint against the current inputs, and `verifyDeps` recursively fetches each dependency (getting a proven `Value`) and checks its fingerprint. If both pass, the memo's `invariant` directly gives the correctness proof.
 
-On a cache miss, `runRecompute` evaluates the task via a free monad tree and builds a fresh `Memo`. The invariant proof uses `FM.evalTree_cross`: if two sets of inputs and dependencies agree at every position recorded in the trace (checked via injective embeddings `hI : ℭ.V i ↪ H` and `hR : ℭ.R q ↪ H`), the free monad tree evaluates to the same result. The injectivity of the hash functions (`Function.Embedding`) is what makes fingerprint comparison sound: `hash a = hash b` implies `a = b`.
+On a cache miss, `runRecompute` evaluates the task via a free monad tree and builds a fresh `Memo`. The invariant proof uses `FM.evalTree_cross`: if two sets of inputs and dependencies agree at every position recorded in the trace (checked via injective embeddings `hI : ℭ.V i ↪ H` and `hR : ℭ.R q ↪ H`), the free monad tree evaluates to the same result. The injectivity of the hash functions (`Function.Embedding`) is what makes fingerprint comparison sound: `hash a = hash b` implies `a = b`. In practice, the `Hashable` instances use 64-bit hashes that are not injective; collisions are possible but astronomically unlikely. The proof assumes an ideal hash function, an injective function into 64 bit integers.
 
-The elaborator's tasks are a single `Tasks` value, independent of which `Build` executes them --- incremental elaboration is provably equivalent to `compute`.
+The elaborator's tasks are a single `Tasks` value, independent of which on`Build` executes them --- incremental elaboration is provably equivalent to `compute`.
 
 The formalisation comprises approximately 1,500 lines of Lean across the core library (Basic, Busy, LessBusy, Shake, FreeTheorem, FreeMonad).

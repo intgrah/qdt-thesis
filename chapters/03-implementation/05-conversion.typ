@@ -1,10 +1,10 @@
 == Conversion checking <sec:conv>
 
-#import "@preview/fletcher:0.5.8": diagram, node, edge
+#import "@preview/fletcher:0.5.8": diagram, edge, node
 
-Conversion checking decides definitional equality. The naive algorithm --- reduce both sides to normal form, compare structurally --- forces all reducible subterms regardless of whether comparison needs them.
+Conversion checking decides definitional equality. The naive algorithm (reduce both sides to normal form, compare structurally) forces all reducible subterms regardless of whether comparison needs them.
 
-The algorithm here, from Kovacs's smalltt @kovacs2023smalltt, bounds speculative work with a three-state mode:
+The algorithm here, from Kovacs's smalltt @kovacs2023smalltt, bounds speculative work with a three modes:
 
 - *Rigid*: the default. When two values have the same defined head, spines are compared speculatively in flex mode. If flex succeeds, no unfolding was needed. If it fails, both sides are unfolded and compared in full mode.
 - *Flex*: entered from rigid's speculative check. No definitions are unfolded; no fallback. Any mismatch causes immediate failure, returning control to rigid.
@@ -14,25 +14,32 @@ The algorithm here, from Kovacs's smalltt @kovacs2023smalltt, bounds speculative
 
 #figure(
   diagram(
-    node-stroke: 0.5pt,
+    node-stroke: 0.6pt,
     node-inset: 8pt,
-    node-corner-radius: 3pt,
     spacing: (60pt, 40pt),
 
-    node((0, 0), [`rigid`], fill: rgb("#e8f0fe"), name: <rigid>),
-    node((2, 0), [`flex`], fill: rgb("#fef7e0"), name: <flex>),
-    node((0, 1), [`full`], fill: rgb("#fce8e6"), name: <full>),
+    node((0, 0), [`rigid`], fill: rgb("#dce4f0"), name: <rigid>),
+    node((2, 0), [`flex`], fill: rgb("#e8dfd0"), name: <flex>),
+    node((0, 1), [`full`], fill: rgb("#e6d0c8"), name: <full>),
 
     edge(<rigid>, <flex>, "->", label: [same head], label-side: left),
-    edge(<flex>, <rigid>, "-->", label: [fail], label-side: left, bend: 20deg),
+    edge(<flex>, <full>, "->", label: [fail], label-side: left),
     edge(<rigid>, <full>, "->", label: [heads differ], label-side: left),
   ),
-  caption: [Conversion state transitions. Rigid speculatively tries flex on matching heads; on failure it falls back to full, which unfolds eagerly.],
+  caption: [Conversion state transitions. ],
 ) <fig:conv-states>
 
 Consider comparing `f (g (h x))` with itself, where `f`, `g`, `h` are top-level definitions. The naive algorithm unfolds all three on both sides. The approximate algorithm observes the same folded structure: same head `f`, same spine. Flex descends into the argument, sees `g`, then `h`, bottoming out at `x` with no unfolding. The check runs in time proportional to the folded term, not the unfolded one.
 
-For eta-conversion: function eta opens both sides at a fresh variable and compares bodies; structure eta compares each projection $s.i$ with the corresponding field $r_i$ of $c(r_1, dots, r_k)$.
+To illustrate, consider comparing `Nat.add 2 3` against `Nat.add 2 3`. Both sides are glued values with the same defined head `Nat.add`. Rigid enters flex speculatively. Flex compares the spines elementwise: the first arguments are both `Nat.succ (Nat.succ Nat.zero)`, same constructor head `Nat.succ`; recurse into the field, same again, down to `Nat.zero` on both sides. The second arguments match similarly. Flex succeeds. No definition body was fetched.
+
+Now comparing `Nat.add 2 3` against `5`. The heads differ: `Nat.add` (a defined constant, appearing as a glued value) versus `Nat.succ` (a constructor, appearing as a neutral). Different heads skip flex and enter full mode. Full forces the glued value via `whnf`, which fetches `Nat.add`'s definition body and fires iota-reduction on the recursor three times, yielding `Nat.succ (Nat.succ (Nat.succ (Nat.succ (Nat.succ Nat.zero))))`. This matches `5`. The check succeeds, but `Nat.add`'s body was fetched, so a dependency is recorded.
+
+=== Eta-conversion
+
+Two cases are handled. _Function eta_: when comparing a lambda against a non-lambda (or two lambdas), both sides are applied to a fresh variable at the current de Bruijn level, and the bodies are compared. This decides $f equiv lambda x. f thin x$ without the term `f` needing to syntactically be a lambda.
+
+_Structure eta_: when one side is a constructor application `c(r_1, ..., r_k)` of a single-constructor inductive (a structure) and the other is an arbitrary term `s`, each projection `s.i` is compared against the corresponding field `r_i`. This decides `c(s.1, s.2, ..., s.k) equiv s`: the constructor applied to all projections of `s` is definitionally equal to `s`.
 
 An alternative, used in Lean's `isDefEq` and Agda's conversion checker, is _on-the-fly_ reduction: whnf each side just enough to decide equality, recurse under binders. This avoids full normal forms, but without the rigid/flex distinction it unfolds whenever heads differ syntactically. The speculative flex check avoids this in the common case of matching defined heads.
 

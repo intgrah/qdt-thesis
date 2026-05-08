@@ -28,7 +28,7 @@ The principal queries:
 
 - `declarationIndex`: maps declaration names to indices within the file. Depends only on the parsed AST.
 - `elabDecl`: elaborates one declaration. Fetches the AST, looks up the declaration, type-checks it. Depends on `constant` queries for every referenced name.
-- `constant`: the elaborated form of a named constant --- the primary cross-declaration dependency.
+- `constant`: the elaborated form of a named constant. This is the primary cross-declaration dependency.
 
 When the elaborator encounters a constant reference, `fetchConstant` issues a `Key.constant` query, registering a dependency. An `entryCache` in `ElabState` memoises lookups within a single elaboration run to avoid repeated queries for the same name.
 
@@ -62,7 +62,7 @@ Finer granularity would require making subterms addressable, adding engineering 
 
 === Dependently-typed query results
 
-The dependent `Val : Key → Type` lets `fetch (Key.constant p n) : Task (Option Constant)` type-check without tagging --- the compiler specialises each call site. The alternatives are a sum type (boilerplate matching at every consumer), an existential (`unsafeCast` at every fetch), or GADTs (where an index on the key type determines the result type, as in Rock and Salsa). Dependent types express this directly.
+The dependent `Val : Key → Type` lets `fetch (Key.constant p n) : Task (Option Constant)` type-check without tagging; the compiler specialises each call site. The alternatives are a sum type (boilerplate matching at every consumer), an existential (`unsafeCast` at every fetch), or GADTs (where an index on the key type determines the result type, as in Rock and Salsa). Dependent types express this directly.
 
 === Query dependency graph
 
@@ -77,21 +77,20 @@ def bar : Type 1 := foo
 
 #figure(
   diagram(
-    node-stroke: 0.5pt,
-    node-fill: rgb("#e8f0fe"),
-    node-inset: 5pt,
-    node-corner-radius: 3pt,
+    node-stroke: 0.6pt,
+    node-fill: rgb("#dce4f0"),
+    node-inset: 6pt,
     spacing: (12pt, 16pt),
 
-    node((1, 0), [`text`], fill: rgb("#fce8e6"), name: <text>),
+    node((1, 0), [`text`], fill: rgb("#e6d0c8"), name: <text>),
     node((1, 1), [`cst`], name: <cst>),
     node((1, 2), [`astSourceMap`], name: <asm>),
     node((1, 3), [`ast`], name: <ast>),
     node((1, 4), [`declarationIndex`], name: <di>),
     node((0, 5), [`elabCmdAt 0`], name: <ec0>),
     node((2, 5), [`elabCmdAt 1`], name: <ec1>),
-    node((0, 6), [`elabDecl foo`], name: <edf>),
-    node((2, 6), [`elabDecl bar`], name: <edb>),
+    node((0, 6), [`elabDecl foo`], fill: rgb("#e8dfd0"), name: <edf>),
+    node((2, 6), [`elabDecl bar`], fill: rgb("#e8dfd0"), name: <edb>),
     node((0, 7), [`lookup foo`], name: <lf>),
     node((0, 8), [`constant foo`], name: <cf>),
 
@@ -118,17 +117,49 @@ def bar : Type 1 := foo
 
 === Glued evaluation and dependency tracking
 
-Glued evaluation (@sec:nbe) produces values carrying a constant's name and universe arguments without fetching its body. The body is fetched only when whnf forces the value. Flex mode compares two glued values with the same head without forcing either side --- no body fetched, no dependency recorded. Only when heads disagree and full mode fires does delta-reduction fetch the body and record a dependency.
+Glued evaluation (@sec:nbe) produces values carrying a constant's name and universe arguments without fetching its body. The body is fetched only when whnf forces the value. Flex mode compares two glued values with the same head without forcing either side: no body fetched, no dependency recorded. Only when heads disagree and full mode fires does delta-reduction fetch the body and record a dependency.
 
 Editing a definition's body thus invalidates only the queries that actually unfolded it. Call sites whose checks succeeded in flex mode have no dependency on the body.
 
+=== The Shake algorithm
+
+When the build system receives a request for query $q$, it executes the following procedure:
+
++ *Cache lookup.* Check if $q$ has a cached `Memo` from a previous build.
++ *Verify input fingerprints.* For each input dependency recorded in the memo, hash the current input value and compare against the stored fingerprint. If any mismatch, go to step 5.
++ *Verify query fingerprints.* For each query dependency recorded in the memo, _recursively fetch_ that dependency (which may itself verify or recompute), hash the result, and compare. If any mismatch, go to step 5.
++ *Cache hit.* All fingerprints match. Return the cached value.
++ *Recompute.* Execute the task, recording which inputs and queries it fetches. Hash the results. Store a new `Memo` with the value and its dependency fingerprints.
+
+@fig:shake-verify illustrates verification on a fragment of the query graph. Each edge is annotated with the fingerprint stored at build time. When `elabDecl bar` is fetched, Shake verifies its dependency `constant foo` by recursively fetching it, which in turn verifies `elabDecl foo` against the input `text`. If the input has changed, `elabDecl foo` is recomputed. If the new result hashes the same as the stored fingerprint on the edge to `constant foo`, verification of `elabDecl bar` still passes (early cutoff). If it hashes differently, `elabDecl bar` is recomputed too.
+
+#figure(
+  diagram(
+    node-stroke: 0.6pt,
+    node-inset: 6pt,
+    spacing: (16pt, 18pt),
+
+    node((1, 0), [`text`], fill: rgb("#e6d0c8"), name: <text>),
+    node((1, 1), [`elabDecl foo`], fill: rgb("#dce4f0"), name: <edf>),
+    node((1, 2), [`constant foo`], fill: rgb("#dce4f0"), name: <cf>),
+    node((1, 3), [`elabDecl bar`], fill: rgb("#dce4f0"), name: <edb>),
+
+    edge(<edf>, <text>, "->", label: text(size: 0.8em)[`h₁`]),
+    edge(<cf>, <edf>, "->", label: text(size: 0.8em)[`h₂`]),
+    edge(<edb>, <cf>, "->", label: text(size: 0.8em)[`h₃`]),
+  ),
+  caption: [Shake verification. Each edge stores a fingerprint (`h₁`, `h₂`, `h₃`) from the previous build. To verify `elabDecl bar`, Shake recursively fetches `constant foo`, which fetches `elabDecl foo`, which checks `h₁` against the current input. If `h₁` mismatches, `elabDecl foo` is recomputed; if its new result still matches `h₂`, `elabDecl bar` is not recomputed (early cutoff).],
+) <fig:shake-verify>
+
+Verification is _suspending_: the build walks the graph demand-driven, recursing into each dependency before deciding whether the current query needs recomputation. This is the suspending scheduler with verifying traces in the terminology of Mokhov, Mitchell, and Peyton Jones @mokhov2018build.
+
 === Early cutoff
 
-Shake stores a hash of each query's result alongside its dependency fingerprints. On a subsequent build, after re-fetching a dependency and recomputing it, Shake compares the new result's hash against the stored one. If they match, dependents of that query are _not_ re-executed — their cached values remain valid. This is _early cutoff_.
+Shake hashes each query's result alongside its dependency fingerprints. When a dependency is recomputed and its result hashes the same as before, the queries that depend on it are not recomputed; their fingerprints still match.
 
-Consider appending a new definition to `Nat.qdt`. The `declarationIndex` query for that file is invalidated (a new name appears in the index), and the new definition's `elabDecl` query runs. But the existing definitions — `Nat.add`, `Nat.succ`, etc. — produce the same `Constant` values as before. Their hashes are unchanged, so `constant Nat.add` returns the cached result. Files that import `Nat` and depend on `constant Nat.add` see the same hash and are not recomputed, even though `Nat.qdt` was edited.
+Consider appending a new definition to `Nat.qdt`. The `declarationIndex` query is invalidated (a new name appears), and the new definition's `elabDecl` query runs. But the existing definitions --- `Nat.add`, `Nat.succ`, etc. --- produce the same `Constant` values as before. Their hashes are unchanged, so `constant Nat.add` returns the cached result. Files that import `Nat` see the same fingerprint and are not recomputed, even though `Nat.qdt` was edited.
 
-Without early cutoff, any edit to `Nat.qdt` would cascade through every file that imports it. With early cutoff, the cascade stops at the first query whose result is unchanged.
+Without early cutoff, any edit to `Nat.qdt` would cascade through every importing file. With early cutoff, the cascade stops at the first query whose result is unchanged.
 
 === Native build system implementations
 
