@@ -87,7 +87,7 @@
   )
 
   par()[
-    I, #if anonymous { [\<Author\> of \<College\>] } else [#author of #college], being a candidate for the #course, hereby declare
+    I, #if anonymous { [_Author_ of _College_] } else [#author of #college], being a candidate for the #course, hereby declare
     that this dissertation and the work described in it are my own work, unaided
     except as may be specified below, and that the dissertation does not contain
     material that has already been used to any substantial extent for a comparable
