@@ -24,10 +24,10 @@ wordcount:
 
 # Raw pdftotext
 wordcount-raw:
-    typst compile count.typ count.pdf
-    @pdftotext count.pdf - \
+    @typst compile count.typ - \
+        | pdftotext - - \
         | sed '/^Bibliography$/,$d' \
         | wc -w
 
 clean:
-    rm -f main.pdf count.pdf
+    rm -f main.pdf
