@@ -25,7 +25,7 @@ Universe levels $ell$ form an algebra of named variables $n$, zero, successor, a
 
 In Russell-style theories (as in Lean 4 itself), types and terms share a single syntactic sort: a $sans("Type")$ expression may appear both as a type and as a term. In our Tarski-style formulation, every position in the syntax tree is unambiguously either a type or a term. The decoding operation $sans("El")$ bridges the two: if $Delta; Gamma tack.r t : sans("Type")_ell$, then $sans("El")(t)$ is a well-formed type.
 
-Russell-style universes admit a simpler implementation --- a single syntactic sort removes the need for `El` coercions and duplicated type/term formers. We choose Tarski style despite this cost because it admits a cleaner categorical semantics: $sans("Type")_ell$ is an object and $sans("El")$ is a morphism, corresponding directly to the structure of a universe in a category with families. The two styles are known to be equivalent up to translation, but the translation is non-trivial, and the metatheory of Tarski universes is easier to present and reason about formally.
+Russell-style universes admit a simpler implementation --- a single syntactic sort removes the need for `El` coercions and duplicated type/term formers. We choose Tarski style despite this cost because it admits a cleaner categorical semantics: $sans("Type")_ell$ is an object and $sans("El")$ is a morphism, corresponding directly to the structure of a universe in a category with families @dybjer1996internal. The two styles are known to be equivalent up to translation, but the translation is non-trivial, and the metatheory of Tarski universes is easier to present and reason about formally.
 
 === Judgement forms
 
