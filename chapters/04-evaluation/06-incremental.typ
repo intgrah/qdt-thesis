@@ -1,4 +1,4 @@
-== Incremental re-elaboration
+== Incremental re-elaboration <sec:incremental-eval>
 
 We measure re-elaboration time after targeted edits on the standard library, using a retained Shake store. The Shake build system is instrumented to count cache hits (queries whose fingerprints match and are reused) and recomputed queries. After a cold build populates the store, each edit modifies one input and triggers a rebuild against the existing cache.
 

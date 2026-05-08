@@ -6,7 +6,7 @@ The dominant cost in elaboration is conversion checking. Type checking a single 
 
 === Build systems à la carte
 
-Mokhov et al. @mokhov2018build observe that build systems bring outputs up to date with respect to changed inputs. They capture Make, Shake, Bazel, and others as instances of a single polymorphic type.
+Mokhov, Mitchell, and Peyton Jones @mokhov2018build observe that build systems bring outputs up to date with respect to changed inputs. They capture Make, Shake, Bazel, and others as instances of a single polymorphic type.
 
 The central abstraction is the _task_: a recipe that requests the values of other keys through a callback, with the build system deciding how those requests are fulfilled. A task is polymorphic in an effect --- it works with any monad the build system chooses. The constraint on the monad determines what the task can do: `Applicative` means all fetches are declared upfront (static dependencies); `Monad` lets the task inspect a result and decide what to fetch next (dynamic dependencies).
 
