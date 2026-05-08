@@ -243,7 +243,7 @@ This design avoids metavariables entirely. Systems with implicit arguments (Lean
 
 The $sans("Sub")$ rule requires deciding definitional equality, which in turn requires reducing terms. _Normalisation by evaluation_ (NbE) @abel2013normalization evaluates syntax into a _semantic domain_ of values, where definitional equality can be checked by structural comparison.
 
-The semantic domain consists of _values_ in weak head normal form. Closures --- a term paired with its environment --- stand for unevaluated function bodies. Neutral terms --- a variable or constant head with a spine of eliminators --- represent computations blocked on an unknown.
+The semantic domain consists of _values_ in weak head normal form. Closures --- a term paired with its environment --- stand for unevaluated function bodies. Neutral terms --- a variable or constant head applied to a _spine_ (a sequence of eliminators: applications and projections) --- represent computations blocked on an unknown.
 
 The syntax uses de Bruijn _indices_ (counting from the innermost binder), while values use de Bruijn _levels_ (counting from the outermost binder). This avoids the need to shift indices during substitution. _Evaluation_ interprets syntax in an environment of values: variables are looked up, lambdas become closures, and applications perform beta-reduction or extend neutral spines. _Quotation_ converts values back to syntax by applying closures to fresh variables and converting levels to indices.
 
@@ -257,20 +257,7 @@ Conversion checking first compares the folded (head) forms. If both sides have t
 
 === Conversion checking
 
-With these components in place, conversion checking compares two values structurally:
-
-- If both sides are neutral with the same head, compare their spines.
-- If both sides are lambdas, apply both to a fresh variable and compare the bodies.
-- If both sides are glued with the same head constant, compare without unfolding.
-- If the heads differ, unfold (delta-reduce) one or both sides and continue.
-
-Following @kovacs2023smalltt, we implement _approximate_ conversion checking with three modes:
-
-- *Rigid*: only unfold when the heads are rigid (constructors or distinct constants). This avoids unnecessary unfolding when variables block comparison.
-- *Flex*: unfold defined constants but stop at variables. Used when rigid comparison fails.
-- *Full*: unfold everything. A last resort when approximate methods are inconclusive.
-
-The checker tries rigid first, then flex, then full. Each mode that avoids unfolding a definition body avoids creating a dependency on that body in the build system --- so approximate conversion checking directly improves incrementality by narrowing the dependency graph.
+With NbE and glued evaluation, conversion checking compares two values by structural descent: matching heads recurse into subterms, lambdas are applied to a fresh variable, and glued values with the same head constant are compared without unfolding. Following @kovacs2023smalltt, the checker uses three modes (rigid, flex, full) to control how eagerly definitions are unfolded, avoiding unnecessary work and, for incrementality, avoiding unnecessary dependencies. The full algorithm is described in @sec:conv.
 
 === The cost of elaboration
 
@@ -352,17 +339,17 @@ structure BuildConfig : Type 1 where
   wf : ∀ ι, WellFounded (rel ι)
 ```
 
-The relation `rel` is indexed by the input state `ι`: different source files can induce different dependency orders among queries. The task type carries the current input state `ι₀` and origin query `q₀`, and the fetch callback requires a proof that the fetched query `q` precedes `q₀`:
+The relation `rel` is indexed by the input state `ι`: different source files can induce different dependency orders among queries. The task type is then refined: it carries the current input state `ι₀` and origin query `q₀`, and the `fetch` callback requires a proof that the fetched query `q` precedes `q₀` in the relation:
 
 ```lean
 def Task (α : Type) : Type 1 :=
-  ∀ (f : Type → Type) [c f],
-    (∀ i, f (ℭ.V i)) →
-    (∀ q, ℭ.rel ι₀ q q₀ → f (ℭ.R q)) →
-    f α
+  ∀ (f : Type → Type) [Monad f],
+    (∀ i, f (V i)) →            -- read an input
+    (∀ q, rel ι₀ q q₀ → f (R q)) → -- fetch a query (with proof)
+    f α                          -- produce a result
 ```
 
-This makes busy evaluation (the naive strategy that always recomputes) provably terminating by well-founded recursion, eliminating the need for runtime cycle detection.
+Reading this bottom-up: a `Task` producing `α` is a program that, given any monad `f`, an input-reading callback, and a query-fetching callback, produces `f α`. The monad is universally quantified so that the same task works under different build strategies. The proof argument `rel ι₀ q q₀` ensures that cycles are ruled out statically, making batch evaluation terminating by well-founded recursion.
 
 ==== Build system structure
 
