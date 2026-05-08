@@ -16,7 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: typst-community/setup-typst@v4
-      - run: typst compile main.typ
+      - name: Install FiraCode Nerd Font
+        run: |
+          mkdir -p fonts
+          curl -fsSL https://github.com/ryanoasis/nerd-fonts/releases/latest/download/FiraCode.zip -o /tmp/firacode.zip
+          unzip -q /tmp/firacode.zip -d fonts
+      - run: typst compile --font-path fonts main.typ
       - uses: actions/upload-artifact@v4
         with:
           name: pdf
@@ -37,14 +42,7 @@ jobs:
         with:
           name: pdf
           path: public
-      - run: |
-          cat > public/index.html <<'EOF'
-          <!doctype html>
-          <meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=main.pdf">
-          <title>Thesis</title>
-          <a href="main.pdf">main.pdf</a>
-          EOF
+      - run: echo '<meta http-equiv=refresh content="0;url=main.pdf">' > public/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
