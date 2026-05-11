@@ -8,3 +8,5 @@ We evaluate correctness, performance, and incrementality.
 #include "04-scaling.typ"
 #include "06-incremental.typ"
 #include "07-discussion.typ"
+#include "08-work-completed.typ"
+#include "09-summary.typ"

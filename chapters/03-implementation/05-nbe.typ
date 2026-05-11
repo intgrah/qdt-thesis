@@ -33,17 +33,13 @@ Variables are represented using de Bruijn _levels_ rather than _indices_. An ind
 
 A closure represents a function body waiting for its argument. In _higher-order abstract syntax_ (HOAS), a closure is a host-language function `VTm -> VTm`: applying it is a native function call. In _defunctionalised_ closures, a closure is a pair of the body's syntax and the captured environment: applying it re-evaluates the body in the extended environment.
 
-HOAS is generally faster, but requires a non-strictly-positive inductive type (`lam : (VTm -> VTm) -> VTm`), which Lean 4's kernel over-approximately rejects, due to the possibility of unsoundness. I use defunctionalised closures to keep the evaluator within the language's logic.
-
-TODO this is just wrong
+HOAS is generally faster, but a closure containing a host-language function has no extensional structure to hash: hashing a `VTm -> VTm` would reduce to hashing a pointer, and pointer hashes are not stable across builds. Shake's early cutoff depends on `Hashable (Val q)` for every query result, so any value reachable from a `Val` must be hashable from its structure. Defunctionalised closures — a pair of syntax and environment — admit a structural hash. I use them for this reason.
 
 === Evaluation
 
 Evaluation interprets syntax in an environment mapping bound variables to their values. Variables look up their value in the environment. Lambdas and Pis capture the current environment to form a closure. Application of a lambda to an argument evaluates the body in the closure's environment extended with the argument. This is where substitution happens, without traversing the body's syntax. Let-bindings are handled the same way: the bound value is evaluated and added to the environment, then the body is evaluated.
 
 Constants receive special treatment. A defined constant (one with a body) evaluates to a _glued_ value: a pair of the folded form (the constant's name and universe arguments) and the information needed to unfold it. The body is not fetched during evaluation; it is deferred until `whnf` forces it.
-
-
 
 === Weak head normalisation
 

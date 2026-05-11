@@ -1,7 +1,7 @@
 #import "@preview/cetz:0.3.4"
 #import "@preview/cetz:0.3.4": canvas, draw
 
-== Scaling benchmarks
+== Scaling benchmarks <sec:scaling>
 
 We compare wall-clock time between qdt and Lean 4 on synthetic programs of increasing size. Lean's time includes kernel checking, which qdt does not perform. Each generator produces a file with $N$ definitions following a specific dependency pattern:
 

@@ -6,17 +6,15 @@ This project built an incremental elaborator for a dependently typed language, w
 
 == Returning to the claims
 
-The introduction made four claims. I revisit each:
+The introduction made four claims. I revisit each.
 
-+ _Existing systems re-check entire file suffixes after an edit_ (@sec:incremental-eval). The incremental elaborator avoids this: changing `Nat.add`'s body in a file imported by five others triggers re-elaboration of only the affected queries. Early cutoff prevents the cascade from propagating when a recomputed result hashes the same.
+_Existing systems re-check entire file suffixes after an edit_ (@sec:incremental-eval). The incremental elaborator avoids this: changing `Nat.add`'s body in a file imported by five others triggers re-elaboration of only the affected queries. Early cutoff prevents the cascade from propagating when a recomputed result hashes the same.
 
-+ _No mainstream proof assistant uses query-based incrementality._ This remains true. The project demonstrates that query-based incrementality is viable for a dependently typed language, with per-declaration granularity and dynamic dependency tracking.
+_No mainstream proof assistant uses query-based incrementality._ This remains true. The project demonstrates that query-based incrementality is viable for a dependently typed language, with per-declaration granularity and dynamic dependency tracking.
 
-+ _Fredriksson's Sixty does not formalise the underlying build system._ The formalised build system framework (@sec:verification) fills this gap.
+_Fredriksson's Sixty does not formalise the underlying build system._ The formalised build system framework (@sec:verification) fills this gap: three build systems inhabit a verified `Build` type, with the free theorem connecting memoising and pure semantics.
 
-TODO: refcounting overhead conclusion
-
-+ _The dependency structure is discovered dynamically during elaboration._ Glued evaluation and approximate conversion checking (@sec:conv) reduce the dependencies recorded: flex-mode comparison avoids fetching definition bodies, and early cutoff prevents propagation when results are unchanged.
+_The dependency structure is discovered dynamically during elaboration._ Glued evaluation and approximate conversion checking (@sec:conv) reduce the dependencies recorded: flex-mode comparison avoids fetching definition bodies, and early cutoff prevents propagation when results are unchanged.
 
 == Extensions beyond the proposal
 
@@ -26,9 +24,11 @@ The original proposal specified using the Salsa framework as a black box. Instea
 
 *Language pivots.* The project moved from Rust to OCaml to Lean 4. Each transition was costly, but Lean's dependent types proved essential: intrinsically scoped terms (`VTm n`), dependently typed query results (`Val : Key -> Type`), and proof-carrying build systems (`{ r // r = compute ... }`) would have required unsafe casts or boilerplate in the other languages.
 
-*Verification methodology.* The free theorem is stated as an axiom in Lean because parametricity cannot be proved internally. This is a limitation of the formalisation, but the axiom is well-established in the literature (Reynolds, Wadler, Voigtlander, Atkey) and its use is confined to a single lemma.
+*Verification methodology.* The free theorem is stated as an axiom in Lean because parametricity cannot be proved internally. The axiom is well-established in the literature (Reynolds, Wadler, Voigtländer, Atkey) and its use is confined to a single lemma. Avoiding `Classical.choice` throughout the formalisation keeps the chain of trust short.
 
-*Performance.* The elaborator is approximately 100x slower than smalltt on normalisation-heavy benchmarks, due to Lean's reference-counting runtime overhead on closure-heavy code. This is a constant factor; the asymptotic behaviour is the same. For interactive use, the incremental rebuild avoids most of this cost.
+*Performance.* The elaborator is roughly two orders of magnitude slower than `smalltt` on normalisation-heavy benchmarks, attributable to the defunctionalised closure representation and Lean's reference-counting runtime overhead on closure-heavy code. The gap is a constant factor; the asymptotic behaviour matches. For interactive use, the incremental rebuild avoids most of this cost: edits that the user actually makes touch a small fraction of queries, and the closure-heavy work is amortised across cache hits.
+
+*Co-locating proofs and code.* Building the proofs in the same language as the elaborator paid off twice. The `Build` type's correctness invariant is literally part of the type; an inhabitant cannot exist without a proof, so the build system's correctness is enforced at compile time rather than by a separate verification step. And the elaborator's `tasks` value is the *same* value the proofs reason about; there is no gap between specification and implementation.
 
 == Future work
 

@@ -39,11 +39,11 @@ Tests sequence multiple `setText` calls and check that diagnostics and hovers up
     [2,804],
     [3.3--3.7],
 
-    [`Qdt/Test/`], [Elaborator regression tests (12 files)], [610], [4.1],
+    [`Qdt/Test/`], [Elaborator unit tests (12 files)], [610], [4.1],
     [`Qdt/Lsp/Test/`], [Incremental tests], [438], [3.8],
     [`FSWatch/`], [File system watcher], [361], [---],
     [`Main.lean`], [CLI entry point], [173], [---],
     [`Lsp.lean`], [Language server entry point], [330], [3.8],
   ),
-  caption: [Source code by directory. Line counts computed with `wc -l`, excluding `.lake` and stdlib examples. Total: 9,203 lines of Lean + 1,141 lines of C.],
+  caption: [Source code by directory. Line counts computed with `wc -l`, excluding `.lake` and example qdt code. Total: 9,203 lines of Lean + 1,141 lines of C.],
 )

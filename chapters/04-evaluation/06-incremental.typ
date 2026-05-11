@@ -1,6 +1,6 @@
 == Incremental re-elaboration <sec:incremental-eval>
 
-We measure re-elaboration time after targeted edits on the standard library, using a retained Shake store. The Shake build system is instrumented to count cache hits (queries whose fingerprints match and are reused) and recomputed queries. After a cold build populates the store, each edit modifies one input and triggers a rebuild against the existing cache.
+We measure re-elaboration time after targeted edits on the handwritten qdt corpus, using a retained Shake store. The Shake build system is instrumented to count cache hits (queries whose fingerprints match and are reused) and recomputed queries. After a cold build populates the store, each edit modifies one input and triggers a rebuild against the existing cache.
 
 #figure(
   table(
@@ -13,7 +13,7 @@ We measure re-elaboration time after targeted edits on the standard library, usi
     [Leaf (append definition to Ackermann.qdt)], [172], [$6.0 times$],
     [Hub (append definition to Nat.qdt)], [170], [$6.0 times$],
   ),
-  caption: [Incremental re-elaboration of the standard library after targeted edits. Speedup is relative to cold build.],
+  caption: [Incremental re-elaboration of the qdt corpus after targeted edits. Speedup is relative to cold build.],
 )
 
 The no-op rebuild verifies every fingerprint in the store but recomputes nothing --- the 129ms is the cost of traversing the dependency graph and checking hashes. The whitespace edit has the same cost: the green tree representation absorbs the whitespace change, the AST hashes the same, and no downstream query is invalidated.

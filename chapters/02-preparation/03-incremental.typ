@@ -2,7 +2,11 @@
 
 == Incremental computation
 
-Type checking a single definition may trigger many conversion checks, each of which may unfold and normalise arbitrarily large terms. After an edit, most of these checks need not be repeated. A query-based system tracks which definitions each check unfolded and skips the rest.
+In a conventional compiler, the type signature is the compilation boundary: changing a function body without changing its type cannot affect downstream type checking. Existing query-based systems for conventional languages — Salsa @salsa2018 in rust-analyzer, the analogous machinery in Roslyn — rely on this. Downstream queries are keyed by the unchanging signature and are invalidated only when the signature itself moves.
+
+A dependently typed elaborator does not enjoy this boundary. The conversion rule (@sec:calculus) admits a term of type $A$ where type $B$ is expected whenever $A equiv B$, and deciding $A equiv B$ may require $delta$-reducing constants — unfolding their bodies — in the course of checking a different definition. A body edit can therefore invalidate downstream type checks even when no signature has moved. Worse, whether a given conversion check unfolds a given body is not known statically: it depends on the specific terms compared, which in turn depend on the types of other definitions. Dependencies are discovered during elaboration, not before it.
+
+Incremental dependent type elaboration therefore needs a build system that supports _dynamic dependencies_ — recorded as the task runs — and _early cutoff_, so that a body edit whose effect on conversion checking is null does not cascade. Type checking a single definition may trigger many conversion checks, each of which may unfold arbitrarily large terms; after an edit, most need not be repeated, and the build system must determine which.
 
 === Build systems à la carte
 

@@ -5,7 +5,7 @@
   author: "Jeremy Chen",
   anonymous: true,
   abstract: [
-    This project implements an incremental, query-based elaborator for a dependently typed language supporting dependent function types, universe polymorphism, and inductive types with recursors. Elaboration is decomposed into per-declaration queries executed by a Shake-based build system formalised in Lean 4. Three build systems are proved to produce the same results as batch evaluation. We evaluate the system on synthetic benchmarks and a standard library, comparing incremental re-elaboration against batch re-elaboration and against Lean 4.
+    This project implements an incremental, query-based elaborator for a dependently typed language supporting dependent function types, universe polymorphism, and inductive types with recursors. Elaboration is decomposed into per-declaration queries executed by a Shake-based build system formalised in Lean 4. Three build systems are proved to produce the same results as batch evaluation. We evaluate the system on synthetic benchmarks and a port of the non-HIT subset of the Lean 2 HoTT library, comparing incremental re-elaboration against batch re-elaboration and against Lean 4.
   ],
   acknowledgements: [
     TODO
