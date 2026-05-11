@@ -35,11 +35,15 @@ A closure represents a function body waiting for its argument. In _higher-order 
 
 HOAS is generally faster, but requires a non-strictly-positive inductive type (`lam : (VTm -> VTm) -> VTm`), which Lean 4's kernel over-approximately rejects, due to the possibility of unsoundness. I use defunctionalised closures to keep the evaluator within the language's logic.
 
+TODO this is just wrong
+
 === Evaluation
 
 Evaluation interprets syntax in an environment mapping bound variables to their values. Variables look up their value in the environment. Lambdas and Pis capture the current environment to form a closure. Application of a lambda to an argument evaluates the body in the closure's environment extended with the argument. This is where substitution happens, without traversing the body's syntax. Let-bindings are handled the same way: the bound value is evaluated and added to the environment, then the body is evaluated.
 
-Constants receive special treatment. A defined constant (one with a body) evaluates to a _glued_ value: a pair of the folded form (the constant's name and universe arguments) and the information needed to unfold it. The body is not fetched during evaluation; it is deferred until `whnf` forces it. This lazy unfolding is important for incrementality: if the conversion checker compares two glued values with the same head and succeeds without forcing either side, no dependency on the definition body is recorded.
+Constants receive special treatment. A defined constant (one with a body) evaluates to a _glued_ value: a pair of the folded form (the constant's name and universe arguments) and the information needed to unfold it. The body is not fetched during evaluation; it is deferred until `whnf` forces it.
+
+
 
 === Weak head normalisation
 

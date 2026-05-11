@@ -2,7 +2,7 @@
 
 == Incremental computation
 
-The dominant cost in elaboration is conversion checking. Type checking a single definition may trigger many conversion checks, each of which may unfold and normalise arbitrarily large terms. In an interactive setting, most of these checks need not be repeated --- only those whose dependencies actually changed. A query-based system can track which definitions each check unfolded, and skip the rest.
+Type checking a single definition may trigger many conversion checks, each of which may unfold and normalise arbitrarily large terms. After an edit, most of these checks need not be repeated. A query-based system tracks which definitions each check unfolded and skips the rest.
 
 === Build systems à la carte
 
@@ -23,4 +23,4 @@ The paper decomposes build systems along two axes: the _scheduler_ determines ex
 
 Dependent type elaboration needs dynamic dependencies (the elaborator discovers which definitions it must unfold only as it runs) and early cutoff (skipping dependents when a recomputed result is unchanged). This places us at the Shake cell.
 
-The polymorphism of the task type makes correctness modular: the elaborator defines tasks without knowing which build system executes them, and vice versa. The formalisation of this framework in Lean 4, including correctness proofs for three build systems, is presented in @ch:evaluation.
+The polymorphism of the task type separates the elaborator from the build strategy: tasks are written once and executed by whichever build system is chosen. The formalisation of this framework in Lean 4 is presented in @sec:verification.

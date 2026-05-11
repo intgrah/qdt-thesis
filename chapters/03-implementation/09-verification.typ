@@ -1,6 +1,6 @@
 == Formal verification <sec:verification>
 
-The build system framework is formalised in Lean 4 with machine-checked proofs. We refine the "Build Systems à la Carte" (BSALC) framework @mokhov2018build in three ways, each forced by the requirements of a dependently typed elaborator.
+The build system framework is formalised in Lean 4 with machine-checked proofs. We refine the "Build Systems à la Carte" (BSALC) framework @mokhov2018build in three ways.
 
 === Refinements over BSALC
 
@@ -61,9 +61,9 @@ structure Build (c) (ℭ : BuildConfig) (J : Type) [Input ℭ J] where
       { r : ℭ.R q // r = compute tasks (inputs store) q } × σ
 ```
 
-Any inhabitant is correct by construction. The elaborator's `tasks` value is defined once and works with any `Build` inhabitant. This separation means the build strategy can be swapped without touching the elaborator: one can use a verified Lean implementation during development and a fast C implementation in production, confident that both compute the same results. Three build systems inhabit this type:
+Any inhabitant produces the same result as `compute`. Three build systems inhabit this type:
 
-*Busy* calls `compute` directly. Correctness follows by definition.
+*Busy* calls `compute` directly.
 
 ```lean
 def Busy : Build c ℭ J where
@@ -73,9 +73,9 @@ def Busy : Build c ℭ J where
 
 === The free theorem <sec:free-theorem>
 
-LessBusy and Shake run tasks in `StateM Cache`, a monad threading a cache of previously computed results. However correctness is stated against `compute`, which runs tasks in `Id` (the trivial monad with no effects). The free theorem establishes that a task produces the same result in both monads, provided the fetches return the same values.
+LessBusy and Shake run tasks in `StateM Cache`, but correctness is stated against `compute`, which runs tasks in `Id`. The free theorem establishes that a task produces the same result in both monads, provided the fetches return the same values.
 
-We argue for the correctness of these build systems via _parametricity_ (Wadler @wadler1989theorems). For example, a function of type `∀ a, List a → List a` can only rearrange, duplicate, or drop elements --- it cannot inspect them, because `a` is abstract. This forces it to commute with `map`: whatever positions it selects, it selects the same way regardless of what occupies them. A `Task` is polymorphic in its monad in the same way: it can only sequence fetches and combine results, never inspect which monad it runs in. If the fetches return the same values in both monads, the task produces the same final result.
+A function of type `∀ a, List a → List a` can only rearrange, duplicate, or drop elements --- it cannot inspect them, because `a` is abstract. A `Task` is polymorphic in its monad in the same way: it can only sequence fetches and combine results. If the fetches return the same values in both monads, the task produces the same result. This is _parametricity_ (Wadler @wadler1989theorems).
 
 To formalise this, we define a `MonadAction` relating two monads --- a family of relations on their carrier types, preserving `pure` and `>>=`:
 
@@ -102,7 +102,7 @@ From the axiom, we derive `Tasks.freeTheorem`: specialising to `κ₁ := StateM 
 
 === LessBusy
 
-Busy recomputes every dependency from scratch, exponential in the depth of the dependency graph. LessBusy avoids this by caching results within a single build, so each query is computed at most once. Each cache entry is a dependent pair `{ r : ℭ.R q // r = compute tasks ι q }`, bundling a value with its correctness proof. The `fetch` function checks the cache first; on a miss, it runs the task, caches the result, and returns it:
+Busy recomputes every dependency from scratch. LessBusy caches results within a single build, so each query is computed at most once. Each cache entry is `{ r : ℭ.R q // r = compute tasks ι q }`. The `fetch` function checks the cache first; on a miss, it runs the task, caches the result, and returns it:
 
 ```lean
 def fetch (q₀ : ℭ.Q) :
@@ -114,7 +114,7 @@ def fetch (q₀ : ℭ.Q) :
 termination_by ℭ.wf.wrap q₀
 ```
 
-Termination follows from the well-founded relation: each recursive `fetch` call provides a proof `ℭ.rel q' q₀`, so the recursion decreases. The `run` function executes the task and produces a proven `Value`; this is where the free theorem is used.
+Termination follows from the well-founded relation. The `run` function executes the task and produces a proven `Value` via the free theorem.
 
 The proof constructs a concrete `MonadAction (StateM VCache) Id`:
 
@@ -139,7 +139,7 @@ The empty cache is passed as the initial state. Each `fetch` call populates it, 
 
 === Shake
 
-LessBusy starts fresh on each build; the cache is discarded between invocations. Shake fills this gap by persisting the cache across builds, using fingerprints to determine which entries are still valid. Each cached `Memo` carries a universally quantified invariant:
+LessBusy starts fresh on each build. Shake persists the cache across builds, using fingerprints to determine which entries are still valid. Each cached `Memo` carries a universally quantified invariant:
 
 ```lean
 structure Memo (q : ℭ.Q) where

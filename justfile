@@ -6,7 +6,7 @@ watch:
 
 # Sort of like texcount
 wordcount:
-    @find chapters/01-introduction chapters/02-preparation chapters/03-implementation chapters/04-evaluation chapters/05-conclusion.typ \
+    @find chapters/01-introduction chapters/02-preparation chapters/03-implementation chapters/04-evaluation chapters/05-conclusion \
         -name '*.typ' -print0 \
         | xargs -0 cat \
         | sed '/^```/,/^```/d' \

@@ -117,9 +117,7 @@ def bar : Type 1 := foo
 
 === Glued evaluation and dependency tracking
 
-Glued evaluation (@sec:nbe) produces values carrying a constant's name and universe arguments without fetching its body. The body is fetched only when whnf forces the value. Flex mode compares two glued values with the same head without forcing either side: no body fetched, no dependency recorded. Only when heads disagree and full mode fires does delta-reduction fetch the body and record a dependency.
-
-Editing a definition's body thus invalidates only the queries that actually unfolded it. Call sites whose checks succeeded in flex mode have no dependency on the body.
+Glued evaluation (@sec:nbe) produces values carrying a constant's name and universe arguments without fetching its body. The body is fetched only when `whnf` forces the value. Flex mode compares two glued values with the same head without forcing either side. Only when heads disagree and full mode fires does delta-reduction fetch the body and record a dependency.
 
 === The Shake algorithm
 

@@ -19,7 +19,7 @@ with
     | .node _ children => children.map width |>.sum
 ```
 
-Nodes store only their kind and children, not absolute positions. Positions are recovered on demand by summing widths from the root. Because nodes lack positions, two identical subtrees are structurally equal regardless of where they appear in the file, making the CST `Hashable`. This is the key property for incrementality: a definition's subtree hashes the same no matter where it sits in the file.
+Nodes store only their kind and children, not absolute positions. Positions are recovered on demand by summing widths from the root. Because nodes lack positions, two identical subtrees are structurally equal regardless of where they appear in the file, making the CST `Hashable`.
 
 Separately, whitespace and comments are parsed as _trivia_ tokens, stored as siblings of content tokens. Lowering discards trivia when producing the AST, so whitespace edits that only affect trivia tokens do not change the AST hash.
 

@@ -14,8 +14,8 @@ The theoretical ancestor of fine-grained incremental computation is _self-adjust
 
 === Salsa
 
-Salsa @salsa2018 is a Rust framework for on-demand, incrementalised computation, used by rust-analyzer @matklad2020rust_analyzer for incremental type checking of Rust. It implements query-based incrementality with memoisation and early cutoff, similar to the Shake cell. I target a dependently typed language, where conversion checking blurs the boundary between signatures and bodies, and provide a formal correctness proof.
+Salsa @salsa2018 is a Rust framework for on-demand, incrementalised computation, used by rust-analyzer @matklad2020rust_analyzer for incremental type checking of Rust. It implements query-based incrementality with memoisation and early cutoff, similar to the Shake cell.
 
 === Sixty
 
-Fredriksson's _sixty_ @fredriksson2019sixty applies query-based incrementality to a dependently typed language, using a Haskell library inspired by BSALC. I formalise the build system in Lean 4 with a machine-checked correctness proof, and implement the elaborator in the same language, so the two share types and definitions.
+Fredriksson's _sixty_ @fredriksson2019sixty applies query-based incrementality to a dependently typed language, using a Haskell library inspired by BSALC.

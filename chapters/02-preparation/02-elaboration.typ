@@ -16,4 +16,4 @@ Type checking requires deciding definitional equality, which requires reducing t
 
 === Conversion checking
 
-_Glued evaluation_ (@kovacs2023smalltt) pairs each defined constant with a folded form (the constant itself) and an unfolded form (its definition body, available lazily), so that conversion checking can compare folded forms first and only unfold when heads differ. Combined with a three-mode approximate algorithm (rigid, flex, full), this avoids unnecessary reduction and, for incrementality, avoids creating unnecessary dependencies. The full algorithm is described in @sec:conv.
+_Glued evaluation_ (@kovacs2023smalltt) pairs each defined constant with a folded form (the constant itself) and an unfolded form (its definition body, available lazily). Conversion checking compares folded forms first and only unfolds when heads differ. Combined with a three-mode approximate algorithm (rigid, flex, full), this avoids unnecessary reduction. The full algorithm is described in @sec:conv.

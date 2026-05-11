@@ -32,5 +32,3 @@ The mode-switching rules:
 `inferTm` always returns a `VTy` produced by `Ty.eval`, so `fnTy` is already in weak head normal form; no `whnf` call is needed to expose the Pi. The codomain is substituted via evaluation in the closure's extended environment, not explicit syntactic substitution.
 
 On failure (`sorry`, unbound variable, type mismatch) the elaborator emits a diagnostic and inserts a fresh axiom as placeholder. The rest of the file remains type-checkable, so the language server can report errors throughout.
-
-

@@ -2,7 +2,7 @@
 
 == Summary
 
-This project set out to build an incremental elaborator for a dependently typed language, using a formalised build system to guarantee that incremental results agree with batch elaboration. The elaborator supports dependent function types, Tarski-style universes with universe polymorphism, inductive types with recursors, and structures with projections, and successfully elaborates a 2,300-line standard library.
+This project built an incremental elaborator for a dependently typed language, with a formalised build system guaranteeing that incremental results agree with batch elaboration.
 
 == Returning to the claims
 
@@ -12,13 +12,15 @@ The introduction made four claims. I revisit each:
 
 + _No mainstream proof assistant uses query-based incrementality._ This remains true. The project demonstrates that query-based incrementality is viable for a dependently typed language, with per-declaration granularity and dynamic dependency tracking.
 
-+ _Fredriksson's Sixty does not formalise the underlying build system._ The formalised build system framework (@sec:verification) provides what Sixty lacks: three build systems (Busy, LessBusy, Shake) proven correct by construction, with the free theorem ensuring that a task polymorphic in its monad produces the same result under any build strategy.
++ _Fredriksson's Sixty does not formalise the underlying build system._ The formalised build system framework (@sec:verification) fills this gap.
+
+TODO: refcounting overhead conclusion
 
 + _The dependency structure is discovered dynamically during elaboration._ Glued evaluation and approximate conversion checking (@sec:conv) reduce the dependencies recorded: flex-mode comparison avoids fetching definition bodies, and early cutoff prevents propagation when results are unchanged.
 
 == Extensions beyond the proposal
 
-The original proposal specified using the Salsa framework as a black box. Instead, the build system was formalised from scratch with machine-checked correctness proofs. Glued evaluation and approximate conversion checking (rigid/flex/full) were added to reduce the dependency graph. A language server with diagnostics and hover information was implemented. Structures with projections and eta-expansion were added to support the standard library's algebraic hierarchy.
+The original proposal specified using the Salsa framework as a black box. Instead, the build system was formalised from scratch. Glued evaluation and approximate conversion checking were added. A language server with diagnostics and hover was implemented. Structures with projections and eta-expansion were added.
 
 == Lessons learnt
 
