@@ -1,3 +1,0 @@
-== Overview
-
-@ch:preparation introduces background: the build system framework of Mokhov et al. and our refinements, the dependent type theory we implement, bidirectional type checking, normalisation by evaluation, and related work. @ch:implementation describes the elaborator's architecture and each pipeline component: parsing, type checking, evaluation, conversion checking, inductive type elaboration, and incremental build and language server infrastructure. @ch:evaluation presents measurements of correctness, batch and incremental performance, and conversion checking speed. @ch:conclusion summarises the results and discusses future work.

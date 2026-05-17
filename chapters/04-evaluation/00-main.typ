@@ -1,12 +1,7 @@
 = Evaluation <ch:evaluation>
 
-We evaluate correctness, performance, and incrementality.
+This chapter answers three questions. The *agreement theorem* and the tests that cover what it does not (@sec:correctness-eval). *Cold elaboration* on the qdt stdlib and the non-HIT subset of Lean 2 HoTT (@sec:cold-eval). *Incremental re-elaboration* under eight edit categories, with a single-parameter cost model that predicts the times from cache hit and miss counts (@sec:incremental-eval).
 
-#include "01-correctness.typ"
-#include "02-batch.typ"
-#include "03-conversion.typ"
-#include "04-scaling.typ"
-#include "06-incremental.typ"
-#include "07-discussion.typ"
-#include "08-work-completed.typ"
-#include "09-summary.typ"
+#include "02-correctness.typ"
+#include "03-cold.typ"
+#include "04-incremental.typ"

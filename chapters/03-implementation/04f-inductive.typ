@@ -1,4 +1,4 @@
-== Inductive types <sec:inductive>
+=== Inductive types <sec:inductive>
 
 An inductive declaration (Dybjer @dybjer1994inductive) introduces a type former, its constructors, and a recursor. The elaboration proceeds in phases: elaborate the type and parameters, register the inductive as opaque (so constructors can refer to it), elaborate each constructor, check strict positivity and universe consistency, then generate the recursor type and its iota-reduction rules.
 

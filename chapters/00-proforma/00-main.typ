@@ -1,27 +1,43 @@
-#heading(outlined: true, numbering: none, "Proforma")
+#import "@preview/wordometer:0.1.5": total-words, word-count-of
+#import "../../template.typ": metrics, num
+
+#let limited(limit: 100, body) = {
+  let n = word-count-of(body).words
+  assert(n <= limit, message: str(n) + " > " + str(limit))
+  body
+}
+
+#heading(outlined: false, numbering: none, "Proforma")
 
 #table(
   columns: 2,
   stroke: none,
-  [*Candidate Number*], [TODO],
-  [*Title*], [Query-based Dependent Type Elaborator],
-  [*Examination*], [Computer Science Tripos --- Part II, 2026],
-  [*Word Count*],
-  [8,532#footnote[Computed via `pdftotext` on the main body (Introduction through Conclusion), including code blocks, tables, and captions.]],
-
-  [*Code Line Count*], [15,774#footnote[Computed with `cloc`.]],
-  [*Project Originator*], [The candidate],
-  [*Project Supervisor*], [Dr Jon Sterling],
+  [Candidate Number], [7268C],
+  [Title], [Query-based Dependent Type Elaborator],
+  [Examination], [Computer Science Tripos Part II, 2026],
+  [Word Count], [#total-words#footnote[Via the `wordometer` Typst package.]],
+  [Code Line Count], [#num(metrics.total)#footnote[Via `cloc`, computed by a handwritten script.]],
+  [Project Originator], [The candidate],
+  [Project Supervisor], [Dr Jon Sterling],
+  [Ethics Approval], [Not required],
 )
 
-== Original aims of the project
+#heading(outlined: false, numbering: none, level: 2)[#smallcaps[Original aims]]
 
-Dependently typed languages --- such as Lean, Agda, and Rocq --- require type checkers that execute arbitrary programs at compile time. Most existing implementations operate in batch mode, re-checking entire files after each edit. This project set out to investigate whether a query-based, incremental approach could reduce the latency of elaboration in an interactive setting, by applying the "Build Systems à la Carte" framework to dependent type elaboration.
+#limited[
+  Dependently typed languages such as Lean, Agda, and Rocq let types depend on terms, so type checking must execute _arbitrary programs_ to compare them. A change to a function's body can therefore affect downstream type checks even when its type is unchanged. Existing type checkers re-elaborate the suffix of the file from the changed name, plus every file that imports it, even when no use actually depends on the change.
 
-== Work completed
+  This project set out to implement an elaborator for a dependently typed language, and to investigate whether per-declaration queries could re-elaborate only the definitions actually affected by each edit.
+]
 
-TODO: fill in once evaluation is complete.
+#heading(outlined: false, numbering: none, level: 2)[#smallcaps[Work completed]]
 
-== Special difficulties
+#limited[
+  All success criteria were met and substantially exceeded. The elaborator type-checks an expressive dependent type theory, capable of elaborating the Lean 2 HoTT library. /* TODO Qualify with "subset" or not? Lean 2-hott exponential blowup */ Incremental re-elaboration takes time proportional to the edit, independent of project size. Beyond the proposal, a machine-checked correctness proof for the build system underlying the elaborator was established in Lean 4 against a reference batch semantics, extending without modification to effectful variants.
+]
 
-None.
+#heading(outlined: false, numbering: none, level: 2)[#smallcaps[Special difficulties]]
+
+#limited[
+  None.
+]

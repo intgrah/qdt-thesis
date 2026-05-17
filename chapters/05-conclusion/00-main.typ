@@ -2,36 +2,18 @@
 
 == Summary
 
-This project built an incremental elaborator for a dependently typed language, with a formalised build system guaranteeing that incremental results agree with batch elaboration.
-
-== Returning to the claims
-
-The introduction made four claims. I revisit each.
-
-_Existing systems re-check entire file suffixes after an edit_ (@sec:incremental-eval). The incremental elaborator avoids this: changing `Nat.add`'s body in a file imported by five others triggers re-elaboration of only the affected queries. Early cutoff prevents the cascade from propagating when a recomputed result hashes the same.
-
-_No mainstream proof assistant uses query-based incrementality._ This remains true. The project demonstrates that query-based incrementality is viable for a dependently typed language, with per-declaration granularity and dynamic dependency tracking.
-
-_Fredriksson's Sixty does not formalise the underlying build system._ The formalised build system framework (@sec:verification) fills this gap: three build systems inhabit a verified `Build` type, with the free theorem connecting memoising and pure semantics.
-
-_The dependency structure is discovered dynamically during elaboration._ Glued evaluation and approximate conversion checking (@sec:conv) reduce the dependencies recorded: flex-mode comparison avoids fetching definition bodies, and early cutoff prevents propagation when results are unchanged.
-
-== Extensions beyond the proposal
-
-The original proposal specified using the Salsa framework as a black box. Instead, the build system was formalised from scratch. Glued evaluation and approximate conversion checking were added. A language server with diagnostics and hover was implemented. Structures with projections and eta-expansion were added.
+Chapter 1 asked whether an incremental elaborator's cache can be made provably equal to a fresh build. This thesis answers in the affirmative on a dependent type theory. A polymorphic build framework was mechanised in Lean 4; two cached inhabitants, LessBusy (intra-build memoisation) and Shake (persistent verifying traces), are proven to agree with a reference `compute` semantics defined by well-founded recursion. The elaborator on top of the verified framework handles Pi types, Sigma types, inductive types, universe polymorphism, structures with eta-conversion, and recursor-based elimination, and runs on subsets of the Lean 2 HoTT port. Incremental rebuilds across a range of edit categories run an order of magnitude faster than a cold build.
 
 == Lessons learnt
 
-*Language pivots.* The project moved from Rust to OCaml to Lean 4. Each transition was costly, but Lean's dependent types proved essential: intrinsically scoped terms (`VTm n`), dependently typed query results (`Val : Key -> Type`), and proof-carrying build systems (`{ r // r = compute ... }`) would have required unsafe casts or boilerplate in the other languages.
+/ Language pivots: The project moved from Rust to OCaml to Lean 4. Lean's dependent types were used in three places: intrinsically scoped terms (`Tm n`), dependently typed query results (`Val : Key -> Type`), and proof-carrying build systems (`{ r // r = compute ... }`). None of these invariants are expressible in the type systems of the other languages; they would have lived as runtime checks or unchecked conventions.
 
-*Verification methodology.* The free theorem is stated as an axiom in Lean because parametricity cannot be proved internally. The axiom is well-established in the literature (Reynolds, Wadler, Voigtländer, Atkey) and its use is confined to a single lemma. Avoiding `Classical.choice` throughout the formalisation keeps the chain of trust short.
+/ Performance: The elaborator is roughly two orders of magnitude slower than `smalltt` on normalisation-heavy benchmarks, which I believe is attributable to the defunctionalised closure representation. For interactive use, the incremental rebuild avoids most of this cost: edits that the user actually makes touch a small fraction of queries, and the closure-heavy work is amortised across cache hits.
 
-*Performance.* The elaborator is roughly two orders of magnitude slower than `smalltt` on normalisation-heavy benchmarks, attributable to the defunctionalised closure representation and Lean's reference-counting runtime overhead on closure-heavy code. The gap is a constant factor; the asymptotic behaviour matches. For interactive use, the incremental rebuild avoids most of this cost: edits that the user actually makes touch a small fraction of queries, and the closure-heavy work is amortised across cache hits.
-
-*Co-locating proofs and code.* Building the proofs in the same language as the elaborator paid off twice. The `Build` type's correctness invariant is literally part of the type; an inhabitant cannot exist without a proof, so the build system's correctness is enforced at compile time rather than by a separate verification step. And the elaborator's `tasks` value is the *same* value the proofs reason about; there is no gap between specification and implementation.
+/ Co-locating proofs and code: The `Build` type's correctness invariant is part of the type; an inhabitant cannot exist without a proof, so the build system's correctness is enforced at compile time. The elaborator's `tasks` value is the same value the proofs reason about; there is no gap between specification and implementation.
 
 == Future work
 
-- *Parallelism.* Mokhov et al. @mokhov2019selective introduce _selective functors_, sitting between `Applicative` and `Monad`. Selective tasks could allow the build system to parallelise queries with static dependencies (e.g. parsing independent files) while retaining dynamic dependencies for elaboration.
-- *Cancellation.* A language server should cancel in-progress elaboration when the user edits again. A middleware framework could support this via an exception monad that preserves partial progress in the memo store.
-- *Pattern matching.* The core theory uses recursors directly. A pattern-matching compiler translating case trees to recursor applications would make the surface language more practical without changing the core.
+/ Parallelism: Queries with static dependencies, such as parsing independent files, are already parallelisable under the applicative fragment of @mokhov2018build's task abstraction. _Selective functors_ @mokhov2019selective extend this to conditional dependencies via _speculative parallelism_: the dependency graph is over-approximated statically and unused branches are discarded at runtime. This would apply to queries whose dependencies depend on intermediate results, sitting between fully static (applicative) and fully dynamic (monadic) tasks.
+
+/ Type classes and coercions: Instance heads carry unification variables (`ToString α → ToString (List α)` fires on `ToString (List Nat)` by solving `α := Nat`), so a metavariable layer is prerequisite. After that, tabled resolution @selsam2020tabled makes each subgoal a memoised entry; its recorded sub-subgoals are the dependencies the build framework already tracks for other queries, so an instance addition invalidates only the goals whose resolution consulted it @saha2003incremental. A resolver written through the framework's `pure`/`bind`/`fetch` primitives inherits the parametricity certificate, so agreement with the batch semantics extends without revisiting the proof.

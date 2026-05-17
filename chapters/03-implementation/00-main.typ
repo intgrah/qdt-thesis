@@ -1,16 +1,10 @@
 = Implementation <ch:implementation>
 
-This chapter describes the implementation of the elaborator. We follow the pipeline from source text to elaborated output: parsing, bidirectional type checking, normalisation by evaluation, conversion checking, inductive type elaboration, and the incremental build architecture that ties them together.
+Chapter 2 identified four obligations a build framework must support to admit a machine-checked agreement theorem. This chapter constructs a framework that satisfies them, instantiates it with three caching strategies, and builds the elaborator on top. @sec:design-goal lists the design choices. @sec:build-framework defines the polymorphic Task abstraction and proves the agreement theorem from it. @sec:build-inhabitants exhibits Busy, LessBusy, and Shake; Shake's agreement proof is the central result. @sec:elaborator builds the elaborator on the verified framework. @sec:lsp wraps it for editor use. @sec:repository overviews the source.
 
-The implementation is in Lean 4. Lean's C FFI is used for the performance-critical build system implementations. Its macro system embeds qdt programs directly in Lean source files as inline test cases. Lean's dependent types make terms intrinsically scoped (`VTm n`) and allow query result types to depend on the query key (`Val : Key -> Type`).
-
-#include "01-architecture.typ"
-#include "02-parsing.typ"
-#include "03-calculus.typ"
-#include "04-bidirectional.typ"
-#include "05-nbe.typ"
-#include "06-conversion.typ"
-#include "07-inductive.typ"
-#include "08-incremental.typ"
-#include "09-lsp.typ"
-#include "10-verification.typ"
+#include "01-design-goal.typ"
+#include "02-build-framework.typ"
+#include "03-build-inhabitants.typ"
+#include "04-elaborator.typ"
+#include "05-lsp.typ"
+#include "07-repository.typ"

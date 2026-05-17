@@ -1,8 +1,8 @@
-== Parsing <sec:parsing>
+=== Parsing <sec:parsing>
 
-The parser is a hand-rolled recursive descent Pratt parser @pratt1973top, implemented as monadic combinators over `EStateM ParseError State`. Source text is first parsed to a concrete syntax tree (`Cst`) retaining trivia and exact token widths, then desugared to an abstract syntax tree (`Ast`) that strips trivia and expands surface syntax.
+The parser is a hand-rolled Pratt parser @pratt1973top, implemented as combinators over `ParserFn := State → State`, where `State` carries the input string, current byte position, a stack of partial `Cst` nodes, and an accumulating error log. Source text is first parsed to a concrete syntax tree (`Cst`) retaining trivia and exact token widths, then lowered to an abstract syntax tree (`Ast`) that strips trivia and expands surface syntax.
 
-=== Green trees
+==== Green trees
 
 #import "@preview/fletcher:0.5.8": diagram, edge, node
 
@@ -23,7 +23,7 @@ Nodes store only their kind and children, not absolute positions. Positions are 
 
 Separately, whitespace and comments are parsed as _trivia_ tokens, stored as siblings of content tokens. Lowering discards trivia when producing the AST, so whitespace edits that only affect trivia tokens do not change the AST hash.
 
-==== Example
+===== Example
 
 Consider the file containing:
 
@@ -100,38 +100,35 @@ The CST is a tree rooted at a `file` node, with trivia (whitespace, comments) an
   caption: [CST for the two-definition file. Whitespace is stored in separate trivia tokens.],
 ) <fig:cst-example>
 
-==== Trivia separation and whitespace edits
+===== Trivia separation and whitespace edits
 
 If the user adds extra spaces within `def a`, only the affected trivia token changes. The content tokens (`"def"`, `"a"`, `":="`, `"Nat.zero"`) are structurally identical. The CST hash does change (the trivia token is different), but lowering discards trivia, so the AST hashes the same as before. No downstream query is invalidated. This is a property of trivia separation in the CST and lowering, not of green trees per se.
 
-==== Position independence and insertion
+===== Position independence and insertion
 
 Green trees store no absolute positions. A definition's subtree is determined entirely by its tokens and their structure, not by where it sits in the file. This means inserting a new definition `c` before `b` does not invalidate `b`'s elaboration: `b`'s subtree is structurally identical before and after the insertion.
 
-The elaboration pipeline uses _paths_ --- lists of child indices relative to a subtree root --- rather than absolute positions. A path `[2, 1]` means "child 2 of the subtree, then child 1 of that". Diagnostics and hovers are keyed by path relative to the declaration's subtree. After the insertion, the `declarationIndex` query (which maps names to indices) recomputes --- `b` is now at a different index --- but `b`'s subtree hashes the same, so `elabDecl b` is not recomputed. Only `c` is elaborated.
+The elaboration pipeline uses _paths_, lists of child indices relative to a subtree root, rather than absolute positions. A path `[2, 1]` means "child 2 of the subtree, then child 1 of that". Diagnostics and hovers are keyed by path relative to the declaration's subtree. After the insertion, the `declarationIndex` query (which maps names to indices) recomputes (`b` is now at a different index), but `b`'s subtree hashes the same, so `elabDecl b` is not recomputed. Only `c` is elaborated.
 
 If nodes stored absolute byte offsets, every node after the insertion point would have a different offset, producing a structurally different tree. Every query depending on those nodes would recompute, even though the source code is semantically unchanged.
 
-=== Language server integration
+==== Language server integration
 
-Desugaring produces, alongside the AST, a `SourceMap` that bidirectionally maps paths in the CST to paths in the AST:
+Lowering produces, alongside the AST, a `SourceMap` that records the source span (byte range in the original input) of each AST path:
 
 ```lean
 structure SourceMap where
-  cstToAst : HashMap Path Path
-  astToCst : HashMap Path Path
+  astToSpan : HashMap Path Span
 ```
 
-The map is populated during desugaring: as each AST node is constructed from a CST node, an entry is added to both tables. The language server uses it in both directions:
+The map is populated during lowering: when an AST node is constructed from a CST subtree, its AST path is associated with the span of that subtree, computed by accumulating token widths from the root. The language server uses this in two directions:
 
-- _Hover_: given a cursor position, the CST is walked to find the path of the token under the cursor. `cstToAst` maps this to the AST path. Hover content is keyed by AST path, so the lookup is direct.
-- _Diagnostics_: the elaborator records diagnostics at AST paths. `astToCst` maps these back to CST paths, which are converted to source spans by summing widths from the root.
+- _Hover_: given a cursor codepoint position, `astPathAtPosition` scans the entries to find the deepest AST path whose span contains the position. Hover content is keyed by AST path, so the subsequent lookup is direct.
+- _Diagnostics_: the elaborator records diagnostics at AST paths. `spanForAstPath` looks up the recorded span, which the LSP layer converts into a UTF-16 range for the editor.
 
-Source positions are reconstructed only at this final step. The entire elaboration pipeline operates on paths, never on byte offsets. Path-based lookup is $O("depth")$ rather than $O("size")$.
+Source positions are materialised only at this final step. The entire elaboration pipeline operates on paths, never on byte offsets.
 
-=== Error recovery
+==== Error recovery
 
 On a parse error, a diagnostic is emitted and the parser skips to the next top-level declaration boundary (`def`, `inductive`, `axiom`, etc.). A single malformed declaration does not prevent the rest of the file from being elaborated.
-
-A separate converter from `Lean.Syntax` to `Ast` via the metaprogramming framework is available for inline test cases in Lean source files, but is not used by the main pipeline.
 
