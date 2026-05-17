@@ -26,7 +26,7 @@ The construction proceeds in four steps. @sec:build-framework defines the `Build
     edge(<src>, <cst>, "->", label: [_parse_]),
 
     node((0, 1.5), none, stroke: none, inset: 0pt, width: 1pt, height: 1pt, name: <mid-desugar>),
-    edge(<cst>, <mid-desugar>, "-", label: [_desugar_]),
+    edge(<cst>, <mid-desugar>, "-", label: [_lower_]),
     edge(<mid-desugar>, <ast>, "->"),
     node((1.4, 1.5), align(center)[Source map], fill: rgb("#e8dfd0"), width: 150pt, name: <sm>),
     edge(<mid-desugar>, <sm>, "-->", stroke: 0.4pt),
@@ -53,6 +53,6 @@ The construction proceeds in four steps. @sec:build-framework defines the `Build
     edge(<hover>, <tyinfo>, "->"),
   ),
   caption: [
-    Elaboration pipeline. Source text is parsed to a CST, then desugared to an AST and a source map between CST and AST paths. The type checker produces core terms and emits diagnostics keyed by AST paths. Diagnostics are mapped through the source map to recover source positions.
+    Elaboration pipeline. Source text is parsed to a CST, then lowered to an AST and a source map between CST and AST paths. The type checker produces core terms and emits diagnostics keyed by AST paths. Diagnostics are mapped through the source map to recover source positions.
   ],
 ) <fig:pipeline>

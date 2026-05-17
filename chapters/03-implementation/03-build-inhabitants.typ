@@ -1,3 +1,5 @@
+#import "../../template.typ": metrics, num
+
 == Build inhabitants <sec:build-inhabitants>
 
 Three inhabitants of `Build` are verified against `compute`: `Busy` runs `compute` directly, `LessBusy` adds within-build memoisation, and `Shake` adds persistent cross-build verifying traces. Two effect-layer extensions, `ShakeTrace` and `ShakeCancel`, inherit the agreement theorem without revisiting the proof.
@@ -105,6 +107,8 @@ On a cache miss, `runRecompute` evaluates the task via a free monad tree @swiers
 
 The elaborator's tasks are a single `Tasks` value, independent of which `Build` inhabitant executes them.
 
+The verified Lean `Shake` lives in `Incremental/Shake/` and uses `runST` with mutable references for the memo table and in-progress cache.
+
 === Effect layers <sec:effect-layers>
 
 The `Build` type carries two type constructors `n` and `m` that wrap each query's result:
@@ -184,4 +188,4 @@ def ShakeC (tasks : Tasks ℭ) : Build ℭ J tasks Id Id where
     (⟨r, sorry⟩, s)
 ```
 
-`Salsa`, `SalsaC`, and `ShakeC` are `Build` inhabitants whose `build` field carries the agreement certificate as a `sorry`: the axiom that the underlying implementation computes the same value as `compute` on the same `Tasks`. They are selected when raw throughput is preferred over the structural proof carried by `Shake`. @sec:incremental-eval reports them alongside `Shake`.
+`Salsa`, `SalsaC`, and `ShakeC` are `Build` inhabitants whose `build` field carries the agreement certificate as a `sorry`: the axiom that the underlying implementation computes the same value as `compute` on the same `Tasks`. The C ports are #num(metrics.rows.shake_c) and #num(metrics.rows.salsa_c) lines respectively; they match Lean's runtime ABI (constructor field order and scalar layout for `Memo` and `Store`, closure arity for the `fetch` and `input` callbacks, reference counting protocol for allocated objects) and skip Lean's closure allocation and monadic bind dispatch on each query. They are selected when raw throughput is preferred over the structural proof carried by `Shake`. @sec:incremental-eval reports them alongside `Shake`.

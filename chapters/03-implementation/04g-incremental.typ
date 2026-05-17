@@ -37,14 +37,6 @@ Elaboration is decomposed into queries managed by a Shake-based build system. Ea
   )
 ]
 
-The principal queries:
-
-- `declarationIndex`: maps declaration names to indices within the file. Depends only on the parsed AST.
-- `declAst`: extracts the AST subtree for a single named declaration. Depends on `declarationIndex` (for the index) and `ast` (for the file).
-- `declScope`: whether one name may be referenced from inside another's elaboration, used as a stable surrogate for the order check (see below).
-- `elabDecl`: elaborates one declaration. Fetches `declAst` for the subtree, then runs the elaborator. Depends on `declScope` and `constant` queries for every referenced name.
-- `constant`: the elaborated form of a named constant. The primary cross-declaration dependency.
-
 When the elaborator encounters a constant reference, `fetchConstant` issues a `Key.constant` query, registering a dependency. An `entryCache` in `ElabState` memoises lookups within a single elaboration run to avoid repeated queries for the same name.
 
 ==== Query wiring
@@ -127,10 +119,6 @@ def bar : Type 1 := foo
   ],
 ) <fig:query-graph>
 
-==== Unfolding
-
-Glued evaluation (@sec:nbe) produces values carrying a constant's name and universe arguments without fetching its definition. The definition is fetched only when `whnf` forces the value. Flex mode compares two glued values with the same head without forcing either side. Only when heads disagree and full mode fires is the definition fetched, and the build system records a dependency on the unfolded constant.
-
 ==== The Shake algorithm
 
 When the build system receives a request for query $q$, it executes the following procedure:
@@ -141,24 +129,136 @@ When the build system receives a request for query $q$, it executes the followin
 + *Cache hit.* All fingerprints match. Return the cached value.
 + *Recompute.* Execute the task, recording which inputs and queries it fetches. Hash the results. Store a new `Memo` with the value and its dependency fingerprints.
 
-@fig:shake-verify illustrates verification on a fragment of the query graph. Each edge is annotated with the fingerprint stored at build time. When `elabDecl bar` is fetched, Shake verifies its dependency `constant foo` by recursively fetching it, which in turn verifies `elabDecl foo` against the input `text`. If the input has changed, `elabDecl foo` is recomputed. If the new result hashes the same as the stored fingerprint on the edge to `constant foo`, verification of `elabDecl bar` still passes (early cutoff). If it hashes differently, `elabDecl bar` is recomputed too.
+@fig:shake-algorithm gives the algorithm as a flowchart. The three escape paths (no Memo, input-hash mismatch, query-hash mismatch) all funnel to a recompute that stores a fresh Memo; matching at every level returns the cached value.
+
+#let _shake_inputc = rgb("#c43a3a")
+#let _shake_recompc = rgb("#c97a3a")
+#let _shake_cutoffc = rgb("#5a9b5a")
+#let _shake_hitc = rgb("#7a7a7a")
+#let _shake_newc = rgb("#7aa8c4")
+#let _shake_xdecl = rgb("#7a3a7a")
+#let _shake_swatch(c) = box(width: 0.8em, height: 0.8em, baseline: -0.05em, stroke: 1.3pt + c)
+
+#import "@preview/fletcher:0.5.8": shapes
 
 #figure(
   diagram(
-    node-stroke: 0.6pt,
-    node-inset: 6pt,
-    spacing: (16pt, 18pt),
+    node-stroke: 0.9pt,
+    node-inset: 5pt,
+    spacing: (14pt, 12pt),
+    edge-stroke: 0.55pt,
+    mark-scale: 75%,
 
-    node((1, 0), [`text`], fill: rgb("#e6d0c8"), name: <text>),
-    node((1, 1), [`elabDecl foo`], fill: rgb("#dce4f0"), name: <edf>),
-    node((1, 2), [`constant foo`], fill: rgb("#dce4f0"), name: <cf>),
-    node((1, 3), [`elabDecl bar`], fill: rgb("#dce4f0"), name: <edb>),
+    node((1, 0), [request `q`], shape: shapes.pill, name: <start>),
+    node((1, 1), [look up `Memo[q]`], name: <lookup>),
+    node((1, 2), [_Memo exists?_], shape: shapes.diamond, name: <exist>),
+    node((1, 3), align(center)[for each $i in$ `inputDeps`: \ check $h_I (i, sans("now"))$ vs $h_I (i, sans("stored"))$], name: <inhash>),
+    node((1, 4), [_all input hashes match?_], shape: shapes.diamond, name: <inok>),
+    node((1, 5), align(center)[for each $q' in$ `queryDeps`: \ recursively fetch $q'$, hash, compare], name: <qhash>),
+    node((1, 6), [_all query hashes match?_], shape: shapes.diamond, name: <qok>),
+    node((1, 7), [return cached `value`], stroke: 1.3pt + _shake_cutoffc, name: <hit>),
 
-    edge(<edf>, <text>, "->", label: text(size: 0.8em)[`h₁`]),
-    edge(<cf>, <edf>, "->", label: text(size: 0.8em)[`h₂`]),
-    edge(<edb>, <cf>, "->", label: text(size: 0.8em)[`h₃`]),
+    node((3, 4), align(center)[recompute task; \ record `inputDeps`, `queryDeps`; \ store new `Memo`], stroke: 1.3pt + _shake_recompc, name: <recomp>),
+    node((3, 6.5), [return new `value`], stroke: 1.3pt + _shake_cutoffc, name: <miss>),
+
+    edge(<start>, <lookup>, "->"),
+    edge(<lookup>, <exist>, "->"),
+    edge(<exist>, <inhash>, "->", label: [yes], label-side: left),
+    edge(<inhash>, <inok>, "->"),
+    edge(<inok>, <qhash>, "->", label: [yes], label-side: left),
+    edge(<qhash>, <qok>, "->"),
+    edge(<qok>, <hit>, "->", label: [yes], label-side: left),
+
+    edge(<exist>, (3, 2), <recomp>, "->", corner-radius: 6pt, label: [no], label-pos: 0.15, label-side: right),
+    edge(<inok>, <recomp>, "->", label: [no], label-side: right),
+    edge(<qok>, (3, 6), <recomp>, "->", corner-radius: 6pt, label: [no], label-pos: 0.15, label-side: right),
+    edge(<recomp>, <miss>, "->"),
   ),
-  caption: [Shake verification. Each edge stores a fingerprint (`h₁`, `h₂`, `h₃`) from the previous build. To verify `elabDecl bar`, Shake recursively fetches `constant foo`, which fetches `elabDecl foo`, which checks `h₁` against the current input. If `h₁` mismatches, `elabDecl foo` is recomputed; if its new result still matches `h₂`, `elabDecl bar` is not recomputed (early cutoff).],
+  caption: [Verify-or-recompute for one query under Shake. The cache-hit path on the left checks input fingerprints, then recursively checks query fingerprints; on any mismatch (or no Memo at all) the task is recomputed and a fresh Memo stored. _Recursively_ in the third decision is the load-bearing word: each `queryDeps` entry triggers the same procedure on its query, so verification walks the dependency graph until it bottoms out at inputs.],
+) <fig:shake-algorithm>
+
+@fig:shake-verify shows the operational consequence on a small file: starting from a two-declaration source `A.qdt`, the user inserts a new declaration `baz` between `foo` and `bar`. Every query depending on `text` is re-evaluated, but the path-keyed `declAst` for `foo` and `bar` produces the same subtree as before (paths are relative to the declaration, not byte offsets in the file), so each recomputed fingerprint matches the stored one. Early cutoff fires at `declAst foo` and `declAst bar`: their dependants (`elabDecl`, `constant`) see unchanged input fingerprints and serve their cached values without re-elaboration.
+
+#figure(
+  kind: image,
+  supplement: [Figure],
+  {
+    set align(center)
+    stack(spacing: 8pt,
+      table(
+        columns: (auto, auto),
+        column-gutter: 18pt,
+        stroke: none,
+        align: (left + top, left + top),
+        [_Before_:
+```lean
+def foo : Nat := 5
+def bar : Nat := foo
+```],
+        [_After_ (inserting `baz`):
+```lean
+def foo : Nat := 5
+def baz : Nat := 7
+def bar : Nat := foo
+```],
+      ),
+      diagram(
+        node-stroke: 1pt,
+        node-inset: 5pt,
+        spacing: (14pt, 14pt),
+        edge-stroke: 0.55pt,
+        mark-scale: 70%,
+
+        node((2, 0), [`text A.qdt`], stroke: 1.4pt + _shake_inputc, name: <text>),
+        node((2, 1), [`ast`], stroke: 1.4pt + _shake_recompc, name: <ast>),
+        node((2, 2), [`declarationIndex`], stroke: 1.4pt + _shake_recompc, name: <di>),
+
+        node((0, 3.3), [`declAst foo`], stroke: 1.4pt + _shake_cutoffc, name: <daf>),
+        node((2, 3.3), [`declAst baz`], stroke: 1.4pt + _shake_newc, name: <dab>),
+        node((4, 3.3), [`declAst bar`], stroke: 1.4pt + _shake_cutoffc, name: <dabr>),
+
+        node((0, 4.6), [`elabDecl foo`], stroke: 1.4pt + _shake_hitc, name: <edf>),
+        node((2, 4.6), [`elabDecl baz`], stroke: 1.4pt + _shake_newc, name: <edb>),
+        node((4, 4.6), [`elabDecl bar`], stroke: 1.4pt + _shake_hitc, name: <edbr>),
+
+        node((0, 5.9), [`constant foo`], stroke: 1.4pt + _shake_hitc, name: <cf>),
+        node((2, 5.9), [`constant baz`], stroke: 1.4pt + _shake_newc, name: <cb>),
+        node((4, 5.9), [`constant bar`], stroke: 1.4pt + _shake_hitc, name: <cbr>),
+
+        edge(<ast>, <text>, "->"),
+        edge(<di>, <ast>, "->"),
+
+        edge(<daf>, <ast>, "->"),
+        edge(<daf>, <di>, "->"),
+        edge(<dab>, <ast>, "->"),
+        edge(<dab>, <di>, "->"),
+        edge(<dabr>, <ast>, "->"),
+        edge(<dabr>, <di>, "->"),
+
+        edge(<edf>, <daf>, "->"),
+        edge(<edb>, <dab>, "->"),
+        edge(<edbr>, <dabr>, "->"),
+
+        edge(<cf>, <edf>, "->"),
+        edge(<cb>, <edb>, "->"),
+        edge(<cbr>, <edbr>, "->"),
+
+        edge(<edbr.south>, (4, 7), (0, 7), <cf.south>, "->",
+          corner-radius: 6pt,
+          stroke: 0.8pt + _shake_xdecl,
+          label: text(size: 7pt, fill: _shake_xdecl)[cross-decl dep],
+          label-pos: 0.5, label-side: right),
+      ),
+      text(size: 8.5pt)[
+        #_shake_swatch(_shake_inputc) input changed
+        #h(6pt) #_shake_swatch(_shake_recompc) recomputed, hash changed
+        #h(6pt) #_shake_swatch(_shake_cutoffc) recomputed, hash unchanged ($->$ cutoff)
+        #h(6pt) #_shake_swatch(_shake_hitc) cache hit
+        #h(6pt) #_shake_swatch(_shake_newc) new
+      ],
+    )
+  },
+  caption: [Rebuild trace after inserting `baz` between `foo` and `bar` in `A.qdt`. The cross-decl edge from `elabDecl bar` to `constant foo` records that elaborating `bar` fetched `foo`'s body during conversion. `text`, `ast`, and `declarationIndex` recompute (orange) because their underlying values changed. `declAst foo` and `declAst bar` recompute, but the file's restructuring leaves each declaration's subtree intact, so their fingerprints match (green) and the cascade stops there. `elabDecl` and `constant` for `foo` and `bar` are cache hits (grey). Only the `baz` column is new work (blue).],
 ) <fig:shake-verify>
 
 Verification is _suspending_: the build walks the graph demand-driven, recursing into each dependency before deciding whether the current query needs recomputation. This is the suspending scheduler with verifying traces in the terminology of @mokhov2018build.
@@ -170,11 +270,3 @@ Shake hashes each query's result alongside its dependency fingerprints. When a d
 Consider appending a new definition to `Nat.qdt`. A new name appears, so the `declarationIndex` query is invalidated and the new definition's `elabDecl` query runs. But the existing `Nat.add`, `Nat.succ`, and other prior definitions produce the same `Constant` values as before. Their hashes are unchanged, so `constant Nat.add` returns the cached result. Files that import `Nat` see the same fingerprint and are not recomputed, even though `Nat.qdt` was edited.
 
 Without early cutoff, any edit to `Nat.qdt` would cascade through every importing file. With early cutoff, the cascade stops at the first query whose result is unchanged.
-
-==== Native build system implementations
-
-The Lean Shake implementation in `Incremental/Shake.lean` uses `runST` with mutable references for the memo table and in-progress cache. Two additional implementations in C, `shake.c` at #num(metrics.rows.shake_c) lines and `salsa.c` at #num(metrics.rows.salsa_c) lines, implement the same `Build` interface via Lean's `@[extern]` FFI.
-
-The C implementations must match Lean's runtime ABI: constructor field order and scalar layout for `Memo` and `Store`, closure arity for the `fetch` and `input` callbacks passed to tasks, and reference counting protocol for all allocated objects.
-
-The C implementation avoids Lean's closure allocation and monadic bind dispatch on each query.

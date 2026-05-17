@@ -6,14 +6,12 @@ Precise per-declaration tracking extends the trusted layer to include the tracke
 
 === Obligations <sec:requires>
 
-A task is polymorphic in the effect monad $f$: it cannot inspect $f$ or branch on its identity. By parametricity, a task instantiated at any $f$ behaves the same way as at any other $f$, given pointwise-related inputs and fetches. The _free theorem_ of the task type @wadler1989theorems is the formal statement of this property, and it is what relates the batch specification (the task at `Id`) to cached implementations.
+A task is polymorphic in the effect monad $f$: it cannot inspect $f$ or branch on its identity. Any inhabitant of `Task` should therefore behave the same way at any two choices of $f$, given pointwise-related inputs and fetches. That property is what relates a cached implementation (in a stateful monad) to a reference implementation that recomputes pure values. Making the relation a Lean theorem rather than an external appeal imposes four obligations on the framework:
 
-For the free theorem to be applicable, the framework must satisfy four obligations:
-
-1. *Dependent result types.* Different queries produce different value types (a parsed AST, a sourcemap, an elaborated constant). The framework's key-value map must be heterogeneous.
-2. *Well-foundedness.* `compute` is the reference batch semantics; its recursion must terminate, so the dependency relation on queries must be well-founded.
-3. *Structural parametricity.* The free theorem is required to bridge memoised and pure semantics. Lean's logic does not admit parametricity as an internal theorem; each task must carry the proof of its own parametricity as a field of its definition.
-4. *Effect orthogonality.* Tracing, cancellation, and IO must be addable without revisiting the agreement proof, so the framework's correctness statement must be polymorphic in two effect layers wrapping the proof-relevant payload.
+1. *Dependent result types.* Different queries produce different value types: the `ast` query returns an `Ast`, `constant` returns a `Constant`, and `type` returns a `ConstantInfo`. The framework's key-value map must be heterogeneous.
+2. *Well-foundedness.* `compute` is the reference batch semantics: elaborating declaration $N$ recurses into each constant that $N$'s conversion check $delta$-unfolds. For this recursion to define a total function in Lean, the dependency relation on queries must be well-founded; qdt supplies the witness as a rank function `Key.rank : Key → Nat` together with inverse-image well-foundedness on $bb(N)$.
+3. *Structural parametricity.* The bridge between memoised and pure semantics relates two runs of the same task: one in a stateful monad (the cached executor) and one with no effects (the reference). Lean's logic does not derive such a relation for free, so each task must carry, as a field of its definition, a proof that any two effect choices agree on related handlers.
+4. *Effect orthogonality.* Tracing (a `TraceT` layer recording a forest of dependency nodes) and cancellation (an `ExceptT Cancelled` layer) must be addable without revisiting the agreement proof, so the framework's correctness statement must be polymorphic in two effect layers wrapping the proof-relevant payload.
 
 === Where qdt's framework sits <sec:framework-sits>
 

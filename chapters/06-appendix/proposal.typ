@@ -1,4 +1,4 @@
-= Project Proposal
+= Project Proposal <sec:proposal>
 
 #heading(outlined: false, numbering: none, level: 3)[Introduction and Description]
 

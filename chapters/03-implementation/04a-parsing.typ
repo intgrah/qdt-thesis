@@ -100,17 +100,13 @@ The CST is a tree rooted at a `file` node, with trivia (whitespace, comments) an
   caption: [CST for the two-definition file. Whitespace is stored in separate trivia tokens.],
 ) <fig:cst-example>
 
-===== Trivia separation and whitespace edits
+===== Trivia and position independence
 
-If the user adds extra spaces within `def a`, only the affected trivia token changes. The content tokens (`"def"`, `"a"`, `":="`, `"Nat.zero"`) are structurally identical. The CST hash does change (the trivia token is different), but lowering discards trivia, so the AST hashes the same as before. No downstream query is invalidated. This is a property of trivia separation in the CST and lowering, not of green trees per se.
+Take the two-declaration file from @fig:cst-example and consider two edits. Adding extra spaces inside `def a` changes only the surrounding trivia token; the content tokens (`"def"`, `"a"`, `":="`, `"Nat.zero"`) are byte-for-byte identical, so the `def a` subtree hashes the same after lowering discards the trivia. Inserting a new declaration `c` between `a` and `b` leaves `b`'s subtree alone: a definition's subtree is determined by its tokens and their structure, and green tree nodes carry no absolute offsets.
 
-===== Position independence and insertion
+The elaboration pipeline uses _paths_, lists of child indices relative to a subtree root, rather than absolute positions. A path `[2, 1]` means "child 2 of the subtree, then child 1 of that". Diagnostics and hovers are keyed by path relative to the declaration's subtree. After the `c` insertion, the `declarationIndex` query (which maps names to indices) recomputes because `b` sits at a different index, but `b`'s subtree hashes the same, so `elabDecl b` is reused from the cache. Only `c` is elaborated.
 
-Green trees store no absolute positions. A definition's subtree is determined entirely by its tokens and their structure, not by where it sits in the file. This means inserting a new definition `c` before `b` does not invalidate `b`'s elaboration: `b`'s subtree is structurally identical before and after the insertion.
-
-The elaboration pipeline uses _paths_, lists of child indices relative to a subtree root, rather than absolute positions. A path `[2, 1]` means "child 2 of the subtree, then child 1 of that". Diagnostics and hovers are keyed by path relative to the declaration's subtree. After the insertion, the `declarationIndex` query (which maps names to indices) recomputes (`b` is now at a different index), but `b`'s subtree hashes the same, so `elabDecl b` is not recomputed. Only `c` is elaborated.
-
-If nodes stored absolute byte offsets, every node after the insertion point would have a different offset, producing a structurally different tree. Every query depending on those nodes would recompute, even though the source code is semantically unchanged.
+If nodes stored absolute byte offsets, every node after the insertion point would have a different offset, producing a structurally different tree, and every query depending on those nodes would recompute even though the source code is semantically unchanged.
 
 ==== Language server integration
 

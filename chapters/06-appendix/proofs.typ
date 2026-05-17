@@ -26,7 +26,7 @@ The cache-miss step of Shake executes the task once under the current input func
 
 == Parametric task interpretation <sec:parametric-task>
 
-Each task is a parametric function: given any monad $f$ and an interpretation of inputs and fetches in $f$, it produces a value in $f$. To reason about two different interpretations of the same task simultaneously, the formalisation introduces #emph[monad actions]. A monad action between two monads $κ_1$ and $κ_2$ is a function that, given any relation $R$ between two (possibly distinct) types $α$ and $β$, returns a relation between computations of type $κ_1 thin α$ and $κ_2 thin β$. Write this lifted relation as $R^*$. It is required to satisfy two closure laws:
+Each task is a parametric function: given any monad $f$ and an interpretation of inputs and fetches in $f$, it produces a value in $f$. To reason about two different interpretations of the same task simultaneously, the formalisation uses the #emph[monad actions] of #ref(<sec:build-framework>, supplement: none). A monad action between two monads $κ_1$ and $κ_2$ is a function that, given any relation $R$ between two (possibly distinct) types $α$ and $β$, returns a relation between computations of type $κ_1 thin α$ and $κ_2 thin β$. Write this lifted relation as $R^*$. It is required to satisfy two closure laws:
 
 - Respect for pure: if $R(a, b)$ then $R^*("pure"(a), "pure"(b))$.
 - Respect for bind: if $R^*(m_1, m_2)$ holds, and whenever $R(a, b)$ the continuations satisfy $S^*(k_1(a), k_2(b))$, then $S^*(m_1 ">>=" k_1, m_2 ">>=" k_2)$.

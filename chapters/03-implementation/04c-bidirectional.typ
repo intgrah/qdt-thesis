@@ -1,15 +1,13 @@
 === Bidirectional type checking <sec:bidirectional>
 
-The elaborator implements the bidirectional discipline @pierce2000local @dunfield2019bidirectional in its form for dependent types @coquand1996algorithm, as two mutually recursive functions over the AST produced by the parser:
+The elaborator follows the bidirectional discipline of @sec:bidirectional-theory, as two mutually recursive functions over the AST produced by the parser:
 
 ```lean
 inferTm : TermContext n → Ast → OptionT (ElabM q₀) (Tm n × VTy n)
 checkTm : TermContext n → VTy n → Ast → ElabM q₀ (Tm n)
 ```
 
-`inferTm` synthesises a core term and its type from an AST node when no expected type is available. `checkTm` consumes an expected type as input and returns a core term at that type. Both are indexed by `TermContext n`, the local context after $n$ bindings, and return a `Tm n` that can mention only those $n$ indices.
-
-The two modes correspond to the two pieces of information the elaborator has on hand. When the expected type is known, from a definition's signature, a let annotation, or a Pi codomain, checking pushes the type into subterms. When no expected type is known, at the head of an application or the bound expression of a let, the elaborator must synthesise a type from the term's syntactic form. The split is exhaustive: every AST constructor has exactly one applicable case in one mode.
+`inferTm` synthesises a core term and its type from an AST node when no expected type is available. `checkTm` consumes an expected type as input and returns a core term at that type. Both are indexed by `TermContext n`, the local context after $n$ bindings, and return a `Tm n` that can mention only those $n$ indices. The AST split between the two functions is exhaustive: every constructor has exactly one applicable case in one mode.
 
 ==== Cases of inference
 

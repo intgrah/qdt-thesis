@@ -2,7 +2,7 @@
 
 == Build systems <sec:build-systems>
 
-We adopt the framework of _Build systems à la carte_ (BSALC) @mokhov2018build. This section introduces the vocabulary; @sec:existing-approaches covers existing instances and @sec:verifying-the-cache derives the obligations a verified instance must satisfy.
+We adopt the framework of _Build systems à la carte_ (BSALC) @mokhov2018build. BSALC classifies build systems along two axes, scheduler and rebuilder, and abstracts the build recipe as the polymorphic Task type; qdt fixes the constraint to `Monad`, adds the four obligations of @sec:requires (dependent result types, well-foundedness, a parametricity certificate, and effect orthogonality), and instantiates three executors in @sec:build-inhabitants. This section introduces the vocabulary; @sec:existing-approaches covers existing instances and @sec:verifying-the-cache derives the obligations a verified instance must satisfy.
 
 === The Task abstraction <sec:task>
 
