@@ -1,0 +1,29 @@
+{
+  "total": 14149,
+  "rows": {
+    "incremental": 704,
+    "incremental_shake": 1752,
+    "incremental_test": 128,
+    "incremental_c": 863,
+    "shake_c": 459,
+    "salsa_c": 404,
+    "qdt_theory": 758,
+    "qdt_frontend": 1390,
+    "qdt": 2456,
+    "qdt_incremental": 364,
+    "qdt_test": 714,
+    "qdt_lsp": 357,
+    "fswatch": 387,
+    "root": 356,
+    "vscode": 564,
+    "examples_lean2hott": 469,
+    "examples_other": 2228,
+    "bench": 659
+  },
+  "corpora": {
+    "stdlib_files": 41,
+    "stdlib_lines": 2414,
+    "lean2hott_files": 170,
+    "lean2hott_lines": 35958
+  }
+}
