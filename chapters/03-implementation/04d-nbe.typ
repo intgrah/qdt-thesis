@@ -1,23 +1,6 @@
 === Normalisation by evaluation <sec:nbe>
 
-#import "@preview/fletcher:0.5.8": diagram, edge, node
-
 The elaborator's NbE follows the algorithm of @sec:nbe-theory: evaluation maps syntax to values in WHNF, quotation reads them back, and defined constants evaluate to glued values whose bodies are forced on demand. This section fixes the data types and the `whnf` function that drive it.
-
-#figure(
-  diagram(
-    node-stroke: 0.6pt,
-    node-inset: 6pt,
-    spacing: (30pt, 20pt),
-
-    node((0, 0), [`Tm` (syntax)], fill: rgb("#dce4f0"), name: <syn>),
-    node((1, 0), [`VTm` (values)], fill: rgb("#e8dfd0"), name: <val>),
-
-    edge(<syn>, <val>, "->", label: [`eval`], bend: 20deg),
-    edge(<val>, <syn>, "->", label: [`quote`], bend: 20deg),
-  ),
-  caption: [NbE round trip.],
-) <fig:nbe-flow>
 
 The syntax `Tm`/`Ty` is the output of elaboration; the semantic domain `VTm`/`VTy` is what evaluation produces. Both are intrinsically scoped: `Tm n` and `VTm n` are indexed by the number of bound variables in scope, so a de Bruijn index or level can only refer to a binder the type system already knows about. Out-of-range references do not typecheck in Lean.
 
@@ -36,9 +19,7 @@ inductive Tm : Nat → Type
   | pi'   : Name → Tm n → Tm (n + 1) → Tm n
   | proj  : Nat → Tm n → Tm n
   | letE  : Name → Ty n → Tm n → Tm (n + 1) → Tm n
-```
 
-```lean
 inductive VTy : Nat → Type
   | u  : Universe → VTy n
   | pi : Name → VTy n → ClosTy n → VTy n
@@ -51,17 +32,19 @@ inductive VTm : Nat → Type
   | pi'     : Name → VTm n → ClosTm n → VTm n
   | glued   : Neutral n → Name → List Universe → VTm n
 
-inductive Neutral : Nat → Type | mk {n} : Head n → Spine n → Neutral n
-inductive Head    : Nat → Type | var {n} : Lvl n → Head n | const {n} : Name → List Universe → Head n
-inductive Spine   : Nat → Type | nil {n} | app {n} : Spine n → VTm n → Spine n | proj {n} : Spine n → Nat → Spine n
-inductive ClosTm  : Nat → Type | mk {n m} : Env n m → Tm (m + 1) → ClosTm n
+inductive Neutral : Nat → Type
+  | mk {n} : Head n → Spine n → Neutral n
+inductive Head : Nat → Type
+  | var {n} : Lvl n → Head n
+  | const {n} : Name → List Universe → Head n
+inductive Spine : Nat → Type
+  | nil {n} | app {n} : Spine n → VTm n → Spine n
+  | proj {n} : Spine n → Nat → Spine n
+inductive ClosTm : Nat → Type
+  | mk {n m} : Env n m → Tm (m + 1) → ClosTm n
 ```
 
 Three differences distinguish the two presentations. First, `Tm.var` uses a de Bruijn index `Idx n`, whereas a value can reference a variable only inside a `Neutral`, where the head is a level `Lvl n`. Second, application and projection do not appear as value constructors; an application of a blocked head accumulates in `Spine`, and the value's `lam` and `pi'` cases close over a `ClosTm`/`ClosTy` rather than carrying syntax under a binder. Third, the value-only constructor `VTm.glued` records a definition that has not yet been unfolded, holding the spine accumulated against the constant's name together with the universe arguments needed to instantiate the body once $delta$-reduction fires.
-
-==== Closures
-
-HOAS is generally faster, but a closure containing a host-language function has no extensional structure to hash: hashing a `VTm -> VTm` would reduce to hashing a pointer, and pointer hashes are not stable across builds. Shake's early cutoff depends on `Hashable (Val q)` for every query result, so any value reachable from a `Val` must be hashable from its structure. Defunctionalised closures, a pair of syntax and environment, admit a structural hash.
 
 ==== Weak head normalisation
 

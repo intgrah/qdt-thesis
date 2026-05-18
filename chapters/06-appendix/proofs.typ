@@ -31,9 +31,9 @@ Each task is a parametric function: given any monad $f$ and an interpretation of
 - Respect for pure: if $R(a, b)$ then $R^*("pure"(a), "pure"(b))$.
 - Respect for bind: if $R^*(m_1, m_2)$ holds, and whenever $R(a, b)$ the continuations satisfy $S^*(k_1(a), k_2(b))$, then $S^*(m_1 ">>=" k_1, m_2 ">>=" k_2)$.
 
-A canonical example is a logical relation parameterised by a state: pair stateful computations whose return values are related, after running both from any starting state. The trace action of #ref(<sec:trace-action>, supplement: none) is one such; the appendix uses two others.
+A canonical example is a logical relation parameterised by a state: pair stateful computations whose return values are related, after running both from any starting state. The trace action of #ref(<sec:trace-action>, supplement: none) is one such; the FM-to-identity action of #ref(<sec:fm-reification>, supplement: none) is another.
 
-Every task carries a parametricity certificate (`Task.param`): for any monad action $A$ and any two input families and two fetch families related pointwise by $A$ at the equality relation, the two interpretations of the task itself are related by $A$ at equality. The certificate is populated constructively by the four primitive task constructors, so the proofs depend on no external parametricity axiom. Choosing the action (deciding what "related" means) is what specialises this generic statement into the lemma needed at each step of the soundness proof.
+Every task carries a parametricity certificate (`Task.param`): for any monad action $A$ and any two input families and two fetch families related pointwise by $A$ at the equality relation, the two interpretations of the task itself are related by $A$ at equality. The certificate is populated constructively by the four primitive task constructors. Choosing the action (deciding what "related" means) specialises this generic statement into the lemma needed at each step of the soundness proof.
 
 == Free-monad reification <sec:fm-reification>
 
@@ -79,11 +79,11 @@ theorem compute_cross (tasks : Tasks ℭ) (q₀ : ℭ.Q)
     compute tasks ι q₀ = compute tasks ι' q₀
 ```
 
-This is the closing tool of the appendix: two input functions that agree at the trace entries produced by the first compute to the same value at $q_0$.
+Two input functions that agree at the trace entries produced by the first compute to the same value at $q_0$.
 
 == Trace action <sec:trace-action>
 
-The cross-input lemma above reasons about trees, but Shake runs the task in a state-transformer monad that accumulates two arrays as the task executes. The recording is asymmetric. Each input read pushes a fresh hashed input entry onto the input array, unconditionally: reading an input is cheap, and verifying a duplicate at cache-hit time costs nothing. Each fetched dependency, by contrast, is pushed onto the dependency array #emph[only if no entry with the same query is already there]. The reason is that at cache-hit time the dependency array is replayed to recursively verify each fetched query, and fetching the same query twice would defeat the purpose of the cache.
+The cross-input lemma above reasons about trees, but Shake runs the task in a state-transformer monad that accumulates two arrays as the task executes. The recording is asymmetric. Each input read pushes a fresh hashed input entry onto the input array, unconditionally: reading an input is cheap, and verifying a duplicate at cache-hit time costs nothing. Each fetched dependency, by contrast, is pushed onto the dependency array _only if no entry with the same query is already there_. At cache-hit time the dependency array is replayed to recursively verify each fetched query, and a duplicate would force two recursive verifications of the same dep.
 
 The deduplicating push is a small operation, `dedupPush`: given a new entry and an accumulator, return the accumulator unchanged if it already contains an entry with the same query, and append the new entry otherwise. Folding `dedupPush` over a list of dependency entries (hashing each value along the way) gives the operation `pushAll`, which produces the final array Shake stores.
 
@@ -97,7 +97,7 @@ The bridge from the imperative run to the syntactic transcript is the monad acti
 
 "Successful return" is captured by a `CanReturn` predicate: an imperative computation can return some final state-and-value pair when running it from a given starting state may yield that pair. For deterministic monads like the identity or pure state monads this is just functional equality of the run with `pure`; for richer monads (exceptions, IO) it picks out the genuinely possible returns.
 
-Two atomic-task lemmas, `runInput'_rel` and `runFetch'_rel`, verify that the imperative primitives Shake uses for each move satisfy the trace-action relation against the syntactic primitives. The first says: running the imperative "read input $i$" primitive pushes the single hashed entry for $i$ at $ι_0(i)$ onto the input array and matches the trace of `pureInput`. The second says: running the imperative "fetch $q$" primitive (after consulting the cache to obtain a verified value $v$) pushes the deduplicated entry for $q$ at $v$ onto the dependency array and matches the trace of `pureFetch`. The proofs of both lemmas are direct: each imperative primitive is a single state update, and the corresponding tree primitive walks exactly one node.
+Two atomic-task lemmas, `runInput'_rel` and `runFetch'_rel`, verify that the imperative primitives Shake uses for each move satisfy the trace-action relation against the syntactic primitives. The first says: running the imperative "read input $i$" primitive pushes the single hashed entry for $i$ at $ι_0(i)$ onto the input array and matches the trace of `pureInput`. The second says: running the imperative "fetch $q$" primitive (after consulting the cache to obtain a verified value $v$) pushes the deduplicated entry for $q$ at $v$ onto the dependency array and matches the trace of `pureFetch`. Each imperative primitive is a single state update and the corresponding tree primitive walks exactly one node, so both proofs are immediate.
 
 Specialising the task's parametricity certificate at the trace action, with these two lemmas as the input and fetch hypotheses, yields a single statement: the full imperative run of the task at $q_0$ is trace-action-related to the full syntactic transcript `tasksTree`.
 
@@ -131,4 +131,4 @@ Fix an arbitrary $ι$ together with the input-hash agreement and dependency-hash
 + #emph[Dependency promotion.] Take an entry of the dependency trace under $ι_0$ and compute under $ι_0$, with query `q` and recorded value `r`. By `evalTrace_deps_value`, the recorded value `r` is compute at `q` under $ι_0$. Applying `pushAll_complete` with the target function sending each $q'$ to $h_R$ of $q'$ and compute at $q'$ under $ι_0$ produces a witness in the stored dependency array whose query is `q` and whose hash is the target value $h_R (#text[`q`], #emph[compute under] ι_0 #emph[at] #text[`q`])$. The dependency-hash agreement at the witness, applied to the same witness, equates $h_R (#text[`q`], #emph[compute under] ι #emph[at] #text[`q`])$ with $h_R (#text[`q`], #emph[compute under] ι_0 #emph[at] #text[`q`])$. Injectivity of $h_R$ at `q` strips this to compute at `q` under $ι$ equals compute at `q` under $ι_0$, which equals `r`. So compute under $ι$ and compute under $ι_0$ agree at every entry of the dependency trace.
 + #emph[Closing.] The cross-input lemma `compute_cross`, applied with the two agreements just established, gives compute at $q_0$ under $ι_0$ equals compute at $q_0$ under $ι$. Composing with the first observation (that the value equals compute at $q_0$ under $ι_0$) proves the value equals compute at $q_0$ under $ι$, as required.
 
-Plugging this lemma into the cache-miss branch of Shake's run discharges the invariant field of the freshly built memo directly, completing the verified construction.
+Plugging this lemma into the cache-miss branch of Shake's run discharges the invariant field of the freshly built memo.

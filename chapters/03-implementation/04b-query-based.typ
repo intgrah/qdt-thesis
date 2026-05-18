@@ -18,19 +18,19 @@ $
   "text" arrow.r.long "ast" arrow.r.long "declarationIndex" arrow.r.long "declAst" arrow.r.long "elabDecl" arrow.r.long "constant".
 $
 
-The `text` query is an input: its value is the file's contents, set externally by the editor or by a CLI run. The `ast` query parses the text into a syntax tree. The `declarationIndex` query extracts the list of top-level names. The `declAst` query extracts the AST subtree for one declaration. The `elabDecl` query runs type checking on that subtree, fetching `constant` queries for any names it mentions. The `constant` query returns the elaborated form of a named declaration.
+`text` is the file's contents (an input); `ast`, `declarationIndex`, and `declAst` decompose parsing; `elabDecl` type-checks a declaration's subtree and fetches `constant` queries for any names it mentions; `constant` resolves a name to its elaborated form.
 
-Cross-declaration dependencies enter the graph at `elabDecl`. When conversion checking unfolds a constant `foo` during the elaboration of `bar`, the framework registers an `elabDecl bar -> constant foo` edge. The edge is recorded when the fetch happens; the framework does not predict it from source. Consider a file with three declarations:
+Cross-declaration dependencies enter the graph at `elabDecl`. When conversion checking unfolds a constant `foo` during the elaboration of `bar`, the framework registers an `elabDecl bar -> constant foo` edge. Consider a file with three declarations:
 
 ```lean
 def double (n : Nat) : Nat := Nat.mul 2 n
 def quad (n : Nat) : Nat := double (double n)
-theorem double_2 : double 2 = 4 := Eq.refl _
+def double_2 : double 2 = 4 := Eq.refl 4
 ```
 
-The body of `quad` mentions `double`, so `elabDecl quad` fetches `constant double` while elaborating the application. The theorem `double_2` forces a conversion check between `double 2` and `4` while elaborating its proof; the check unfolds `double` and $iota$-reduces `Nat.mul`, registering a dependency from `elabDecl double_2` on `constant double` that records the body, not only the type.
+The body of `quad` mentions `double`, so `elabDecl quad` fetches `constant double` while elaborating the application. The theorem `double_2` forces a conversion check between `double 2` and `4` while elaborating its proof; the check unfolds `double` and $iota$-reduces `Nat.mul`, registering a body-level dependency from `elabDecl double_2` on `constant double`.
 
-Changing the body of `double` from `Nat.mul 2 n` to `Nat.add n n` leaves the type unchanged: `elabDecl quad`'s cache survives because it saw only the type, while `elabDecl double_2`'s cache is invalidated because it saw the body. Changing the type of `double` invalidates both. Adding a blank line at the top of the file changes `text` and recomputes `ast` and `declarationIndex`, but `declAst double`, `declAst quad`, and `declAst double_2` all produce the same subtrees, so the cascade stops there.
+Changing the body of `double` from `Nat.mul 2 n` to `Nat.add n n` leaves the type unchanged: `elabDecl quad`'s cache survives because it saw only the type, while `elabDecl double_2`'s cache is invalidated because it saw the body.
 
 ==== Dynamic dependencies
 

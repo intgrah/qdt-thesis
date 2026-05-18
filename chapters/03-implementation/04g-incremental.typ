@@ -1,8 +1,8 @@
-#import "../../template.typ": metrics, num
+#import "../../template.typ": diff
 
 === Incremental elaboration <sec:incremental>
 
-Elaboration is decomposed into queries managed by a Shake-based build system. Each query has a tag and parameters; its result type is determined by the tag. `Key` has 17 cases; the principal ones are listed.
+Elaboration is decomposed into queries managed by a Shake-based build system. Each query has a tag and parameters; its result type is determined by the tag. `Key` has 20 cases; the principal ones are listed.
 
 #[
   #show raw.where(block: true): set block(width: auto)
@@ -61,14 +61,6 @@ abbrev ElabM := ReaderT ElabContext (StateT ElabState (Task config q₀))
 
 `Task` is the query monad: `Task.fetch` calls register dependencies. `StateT ElabState` threads the local environment, constant cache, and accumulated diagnostics and hovers. `ReaderT ElabContext` carries file path, declaration name, and universe parameters. `q₀` identifies the current query in the dependency graph.
 
-==== Granularity of queries
-
-If queries are too coarse, such as per-file granuality, any edit invalidates the whole file. If they are too fine, per-expression, the per-query overhead dominates.
-
-I chose per-declaration granularity. `Key.elabDecl` elaborates one `def`, `inductive`, or `structure`. Dependent declarations are recomputed only if the edit changes the cached `Constant`.
-
-Finer granularity would require making subterms addressable, adding engineering complexity for diminishing returns.
-
 ==== Query dependency graph
 
 @fig:query-graph shows the query dependency graph for a two-definition file:
@@ -82,22 +74,21 @@ def bar : Type 1 := foo
 
 #figure(
   diagram(
-    node-stroke: 0.6pt,
-    node-fill: rgb("#dce4f0"),
-    node-inset: 6pt,
-    spacing: (12pt, 16pt),
+    node-stroke: 0.5pt,
+    node-inset: 5pt,
+    spacing: (10pt, 9pt),
 
-    node((1, 0), [`text`], fill: rgb("#e6d0c8"), name: <text>),
+    node((1, 0), [`text`], name: <text>),
     node((1, 1), [`astSourceMap`], name: <asm>),
     node((1, 2), [`ast`], name: <ast>),
     node((1, 3), [`declarationIndex`], name: <di>),
     node((0, 4), [`declAst foo`], name: <daf>),
     node((2, 4), [`declAst bar`], name: <dab>),
-    node((2, 5), [`declScope foo<bar`], name: <ds>),
-    node((0, 6), [`elabDecl foo`], fill: rgb("#e8dfd0"), name: <edf>),
-    node((2, 6), [`elabDecl bar`], fill: rgb("#e8dfd0"), name: <edb>),
-    node((0, 7), [`lookup foo`], name: <lf>),
-    node((0, 8), [`constant foo`], name: <cf>),
+    node((2, 5), [`declScope` $"foo" < "bar"$], name: <ds>),
+    node((0, 5), [`elabDecl foo`], name: <edf>),
+    node((-1, 5), [`lookup foo`], name: <lf>),
+    node((-1, 6), [`constant foo`], name: <cf>),
+    node((2, 6), [`elabDecl bar`], name: <edb>),
 
     edge(<asm>, <text>, "->"),
     edge(<ast>, <asm>, "->"),
@@ -110,127 +101,68 @@ def bar : Type 1 := foo
     edge(<edf>, <daf>, "->"),
     edge(<edb>, <dab>, "->"),
     edge(<edb>, <ds>, "->"),
-    edge(<edb>, <cf>, "->", bend: 30deg),
+    edge(<edb>, <cf>, "->"),
     edge(<lf>, <edf>, "->"),
     edge(<cf>, <lf>, "->"),
   ),
   caption: [
-    Query dependency graph for a file with two definitions. Arrows point from a query to its dependencies. The `text` node (red) is the input. Elaborating `bar` depends on `declAst bar` for its subtree, `declScope foo<bar` for the order check, and `constant foo`. Editing `foo`'s body invalidates `astSourceMap`, `ast`, and the `declAst` queries; `declAst bar`'s value is unchanged so the cutoff fires there. `elabDecl foo` recomputes; if the resulting `Constant` hashes the same (e.g. the type is unchanged), `elabDecl bar` is not recomputed. Inserting a sibling between `foo` and `bar` invalidates `declarationIndex`, but the `declScope` and `declAst` queries return the same values, so `elabDecl bar` still hits cache.
+    Query dependency graph for the two-definition example. Arrows go from each query to its dependencies. The horizontal edge from elabDecl bar to constant foo records that bar's elaboration fetched foo's body during conversion.
   ],
 ) <fig:query-graph>
 
 ==== The Shake algorithm
 
-When the build system receives a request for query $q$, it executes the following procedure:
+The mechanism Shake follows when servicing a request for query $q$ is Mitchell's verifying-trace scheme @mitchell2012shake. Each cached `Memo` stores not only $q$'s value but a trace: the inputs the task read, the queries it fetched, and the hash of each at the time the task ran. On the next build, Shake checks whether the world still matches what the trace recorded, and runs the task again only when something has changed.
 
-+ *Cache lookup.* Check if $q$ has a cached `Memo` from a previous build.
-+ *Verify input fingerprints.* For each input dependency recorded in the memo, hash the current input value and compare against the stored fingerprint. If any mismatch, go to step 5.
-+ *Verify query fingerprints.* For each query dependency recorded in the memo, _recursively fetch_ that dependency (which may itself verify or recompute), hash the result, and compare. If any mismatch, go to step 5.
-+ *Cache hit.* All fingerprints match. Return the cached value.
-+ *Recompute.* Execute the task, recording which inputs and queries it fetches. Hash the results. Store a new `Memo` with the value and its dependency fingerprints.
+The check is recursive. Shake hashes every recorded input against the current input, and for every recorded query dependency it fetches that dependency --- which may itself verify or recompute --- and hashes the result. If all the hashes match, the cached value stands; if any one differs, the task runs, records fresh dependencies, and replaces the old `Memo`. The recursive structure is what makes verification _suspending_ in the @mokhov2018build classification: deciding whether $q$'s memo is fresh suspends inside the decision for some dependency $d$, which suspends inside $e$, until every transitive trace entry has either matched its fingerprint or triggered a recompute.
 
-@fig:shake-algorithm gives the algorithm as a flowchart. The three escape paths (no Memo, input-hash mismatch, query-hash mismatch) all funnel to a recompute that stores a fresh Memo; matching at every level returns the cached value.
-
-#let _shake_inputc = rgb("#c43a3a")
-#let _shake_recompc = rgb("#c97a3a")
-#let _shake_cutoffc = rgb("#5a9b5a")
-#let _shake_hitc = rgb("#7a7a7a")
-#let _shake_newc = rgb("#7aa8c4")
-#let _shake_xdecl = rgb("#7a3a7a")
-#let _shake_swatch(c) = box(width: 0.8em, height: 0.8em, baseline: -0.05em, stroke: 1.3pt + c)
-
-#import "@preview/fletcher:0.5.8": shapes
-
-#figure(
-  diagram(
-    node-stroke: 0.9pt,
-    node-inset: 5pt,
-    spacing: (14pt, 12pt),
-    edge-stroke: 0.55pt,
-    mark-scale: 75%,
-
-    node((1, 0), [request `q`], shape: shapes.pill, name: <start>),
-    node((1, 1), [look up `Memo[q]`], name: <lookup>),
-    node((1, 2), [_Memo exists?_], shape: shapes.diamond, name: <exist>),
-    node((1, 3), align(center)[for each $i in$ `inputDeps`: \ check $h_I (i, sans("now"))$ vs $h_I (i, sans("stored"))$], name: <inhash>),
-    node((1, 4), [_all input hashes match?_], shape: shapes.diamond, name: <inok>),
-    node((1, 5), align(center)[for each $q' in$ `queryDeps`: \ recursively fetch $q'$, hash, compare], name: <qhash>),
-    node((1, 6), [_all query hashes match?_], shape: shapes.diamond, name: <qok>),
-    node((1, 7), [return cached `value`], stroke: 1.3pt + _shake_cutoffc, name: <hit>),
-
-    node((3, 4), align(center)[recompute task; \ record `inputDeps`, `queryDeps`; \ store new `Memo`], stroke: 1.3pt + _shake_recompc, name: <recomp>),
-    node((3, 6.5), [return new `value`], stroke: 1.3pt + _shake_cutoffc, name: <miss>),
-
-    edge(<start>, <lookup>, "->"),
-    edge(<lookup>, <exist>, "->"),
-    edge(<exist>, <inhash>, "->", label: [yes], label-side: left),
-    edge(<inhash>, <inok>, "->"),
-    edge(<inok>, <qhash>, "->", label: [yes], label-side: left),
-    edge(<qhash>, <qok>, "->"),
-    edge(<qok>, <hit>, "->", label: [yes], label-side: left),
-
-    edge(<exist>, (3, 2), <recomp>, "->", corner-radius: 6pt, label: [no], label-pos: 0.15, label-side: right),
-    edge(<inok>, <recomp>, "->", label: [no], label-side: right),
-    edge(<qok>, (3, 6), <recomp>, "->", corner-radius: 6pt, label: [no], label-pos: 0.15, label-side: right),
-    edge(<recomp>, <miss>, "->"),
-  ),
-  caption: [Verify-or-recompute for one query under Shake. The cache-hit path on the left checks input fingerprints, then recursively checks query fingerprints; on any mismatch (or no Memo at all) the task is recomputed and a fresh Memo stored. _Recursively_ in the third decision is the load-bearing word: each `queryDeps` entry triggers the same procedure on its query, so verification walks the dependency graph until it bottoms out at inputs.],
-) <fig:shake-algorithm>
-
-@fig:shake-verify shows the operational consequence on a small file: starting from a two-declaration source `A.qdt`, the user inserts a new declaration `baz` between `foo` and `bar`. Every query depending on `text` is re-evaluated, but the path-keyed `declAst` for `foo` and `bar` produces the same subtree as before (paths are relative to the declaration, not byte offsets in the file), so each recomputed fingerprint matches the stored one. Early cutoff fires at `declAst foo` and `declAst bar`: their dependants (`elabDecl`, `constant`) see unchanged input fingerprints and serve their cached values without re-elaboration.
+@fig:shake-verify traces an example. Starting from a two-declaration source `A.qdt`, the user inserts a new declaration `baz` between `foo` and `bar`. `text`, `ast`, and `declarationIndex` recompute to fresh hashes because the file structure changed. `declAst foo` and `declAst bar` see their input fingerprints (`ast`, `declarationIndex`) mismatch, so they too recompute---but `declAst` is keyed by paths relative to the declaration, so the recomputed subtrees are byte-identical to the previous ones and the new fingerprints match the stored ones. Cutoff fires here: `elabDecl foo`, `elabDecl bar`, and the `constant` queries above them see every input fingerprint match and serve cached values.
 
 #figure(
   kind: image,
   supplement: [Figure],
   {
     set align(center)
-    stack(spacing: 8pt,
-      table(
-        columns: (auto, auto),
-        column-gutter: 18pt,
-        stroke: none,
-        align: (left + top, left + top),
-        [_Before_:
-```lean
-def foo : Nat := 5
-def bar : Nat := foo
-```],
-        [_After_ (inserting `baz`):
-```lean
-def foo : Nat := 5
-def baz : Nat := 7
-def bar : Nat := foo
-```],
-      ),
-      diagram(
-        node-stroke: 1pt,
+    let lbl(name, h) = [
+      #raw(name)\
+      #text(size: 7pt, raw(h))
+    ]
+    stack(
+      spacing: 14pt,
+      block(width: 60%, diff(
+        (" ", "def foo : Nat := 5"),
+        ("+", "def baz : Nat := 7"),
+        (" ", "def bar : Nat := foo"),
+      )),
+      scale(85%, reflow: true, diagram(
+        node-stroke: 0.5pt,
         node-inset: 5pt,
-        spacing: (14pt, 14pt),
-        edge-stroke: 0.55pt,
+        spacing: (18pt, 22pt),
+        edge-stroke: 0.5pt,
         mark-scale: 70%,
 
-        node((2, 0), [`text A.qdt`], stroke: 1.4pt + _shake_inputc, name: <text>),
-        node((2, 1), [`ast`], stroke: 1.4pt + _shake_recompc, name: <ast>),
-        node((2, 2), [`declarationIndex`], stroke: 1.4pt + _shake_recompc, name: <di>),
+        node((2, 0), lbl("text A.qdt", "4a3f → c29b"), name: <text>),
+        node((2, 1), lbl("ast", "e1c4 → 5b8a"), name: <ast>),
+        node((2, 2), lbl("declarationIndex", "b6d2 → 8170"), name: <di>),
 
-        node((0, 3.3), [`declAst foo`], stroke: 1.4pt + _shake_cutoffc, name: <daf>),
-        node((2, 3.3), [`declAst baz`], stroke: 1.4pt + _shake_newc, name: <dab>),
-        node((4, 3.3), [`declAst bar`], stroke: 1.4pt + _shake_cutoffc, name: <dabr>),
+        node((0, 3), lbl("declAst foo", "7c41 → 7c41"), name: <daf>),
+        node((2, 3), lbl("declAst baz", "(new) 60e5"), name: <dab>),
+        node((4, 3), lbl("declAst bar", "5208 → 5208"), name: <dabr>),
 
-        node((0, 4.6), [`elabDecl foo`], stroke: 1.4pt + _shake_hitc, name: <edf>),
-        node((2, 4.6), [`elabDecl baz`], stroke: 1.4pt + _shake_newc, name: <edb>),
-        node((4, 4.6), [`elabDecl bar`], stroke: 1.4pt + _shake_hitc, name: <edbr>),
+        node((0, 4), lbl("elabDecl foo", "1fa9"), name: <edf>),
+        node((2, 4), lbl("elabDecl baz", "(new) 4d7b"), name: <edb>),
+        node((4, 4), lbl("elabDecl bar", "086c"), name: <edbr>),
 
-        node((0, 5.9), [`constant foo`], stroke: 1.4pt + _shake_hitc, name: <cf>),
-        node((2, 5.9), [`constant baz`], stroke: 1.4pt + _shake_newc, name: <cb>),
-        node((4, 5.9), [`constant bar`], stroke: 1.4pt + _shake_hitc, name: <cbr>),
+        node((0, 5), lbl("constant foo", "9d33"), name: <cf>),
+        node((2, 5), lbl("constant baz", "(new) a9f1"), name: <cb>),
+        node((4, 5), lbl("constant bar", "3358"), name: <cbr>),
 
         edge(<ast>, <text>, "->"),
         edge(<di>, <ast>, "->"),
 
         edge(<daf>, <ast>, "->"),
         edge(<daf>, <di>, "->"),
-        edge(<dab>, <ast>, "->"),
+        edge(<dab>, <ast>, "->", bend: 50deg),
         edge(<dab>, <di>, "->"),
         edge(<dabr>, <ast>, "->"),
         edge(<dabr>, <di>, "->"),
@@ -243,25 +175,22 @@ def bar : Nat := foo
         edge(<cb>, <edb>, "->"),
         edge(<cbr>, <edbr>, "->"),
 
-        edge(<edbr.south>, (4, 7), (0, 7), <cf.south>, "->",
-          corner-radius: 6pt,
-          stroke: 0.8pt + _shake_xdecl,
-          label: text(size: 7pt, fill: _shake_xdecl)[cross-decl dep],
-          label-pos: 0.5, label-side: right),
-      ),
-      text(size: 8.5pt)[
-        #_shake_swatch(_shake_inputc) input changed
-        #h(6pt) #_shake_swatch(_shake_recompc) recomputed, hash changed
-        #h(6pt) #_shake_swatch(_shake_cutoffc) recomputed, hash unchanged ($->$ cutoff)
-        #h(6pt) #_shake_swatch(_shake_hitc) cache hit
-        #h(6pt) #_shake_swatch(_shake_newc) new
-      ],
+        edge(
+          <edbr.east>,
+          (5.2, 4),
+          (5.2, 5.7),
+          (-1.2, 5.7),
+          (-1.2, 5),
+          <cf.west>,
+          "->",
+          corner-radius: 5pt,
+          stroke: (dash: "dashed", thickness: 0.5pt),
+        ),
+      )),
     )
   },
-  caption: [Rebuild trace after inserting `baz` between `foo` and `bar` in `A.qdt`. The cross-decl edge from `elabDecl bar` to `constant foo` records that elaborating `bar` fetched `foo`'s body during conversion. `text`, `ast`, and `declarationIndex` recompute (orange) because their underlying values changed. `declAst foo` and `declAst bar` recompute, but the file's restructuring leaves each declaration's subtree intact, so their fingerprints match (green) and the cascade stops there. `elabDecl` and `constant` for `foo` and `bar` are cache hits (grey). Only the `baz` column is new work (blue).],
+  caption: [Rebuild trace after inserting `baz`. `h → h'` recomputed (cutoff when $h = h'$), `h` cache hit, `(new) h` first appearance. The dashed edge `elabDecl bar → constant foo` was recorded by conversion.],
 ) <fig:shake-verify>
-
-Verification is _suspending_: the build walks the graph demand-driven, recursing into each dependency before deciding whether the current query needs recomputation. This is the suspending scheduler with verifying traces in the terminology of @mokhov2018build.
 
 ==== Early cutoff
 

@@ -29,8 +29,9 @@ set root (count Main.lean Lsp.lean FSWatch.lean Qdt.lean lakefile.lean)
 set vscode (count vscode-qdt/src/* vscode-qdt/syntaxes/qdt.json vscode-qdt/language-configuration.json)
 set examples_lean2hott (count examples/lean2-hott/Lean2Export.lean examples/lean2-hott/port.sh examples/lean2-hott/build-lean2.sh)
 set examples_other (count_dir examples/stdlib examples/long)
+set bench (count bench/lib.fish bench/cold.fish bench/cold-hott.fish bench/chain.fish bench/scatter.fish bench/incremental.fish bench/conversion.fish bench/variants/Conversion.WithFlex.lean bench/variants/Conversion.NoFlex.lean)
 
-set total (math $incremental + $incremental_shake + $incremental_test + $incremental_c + $qdt_theory + $qdt_frontend + $qdt + $qdt_incremental + $qdt_test + $qdt_lsp + $fswatch + $root + $vscode + $examples_lean2hott + $examples_other)
+set total (math $incremental + $incremental_shake + $incremental_test + $incremental_c + $qdt_theory + $qdt_frontend + $qdt + $qdt_incremental + $qdt_test + $qdt_lsp + $fswatch + $root + $vscode + $examples_lean2hott + $examples_other + $bench)
 
 set stdlib_files (git ls-files examples/stdlib | wc -l | string trim)
 set stdlib_lines (git ls-files examples/stdlib | xargs cat 2>/dev/null | wc -l | string trim)
@@ -56,6 +57,7 @@ jq -n \
     --argjson vscode $vscode \
     --argjson examples_lean2hott $examples_lean2hott \
     --argjson examples_other $examples_other \
+    --argjson bench $bench \
     --argjson stdlib_files $stdlib_files \
     --argjson stdlib_lines $stdlib_lines \
     --argjson lean2hott_files $lean2hott_files \
@@ -79,7 +81,8 @@ jq -n \
             root: $root,
             vscode: $vscode,
             examples_lean2hott: $examples_lean2hott,
-            examples_other: $examples_other
+            examples_other: $examples_other,
+            bench: $bench
         },
         corpora: {
             stdlib_files: $stdlib_files,

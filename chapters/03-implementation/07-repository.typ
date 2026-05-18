@@ -2,7 +2,7 @@
 
 == Repository overview <sec:repository>
 
-The repository follows the standard structure of a Lean 4 project, with `lakefile.lean` at the root and a top-level `.lean` file re-exporting each module. The two principal modules are `Qdt/` (the elaborator and language server) and `Incremental/` (the build system framework, independent of the elaborator). Each has a parallel `Test/` subtree and a `c/` subdirectory for native code. `FSWatch/` is a self-contained file system watcher wrapping OS-level APIs.
+The repository follows the standard structure of a Lean 4 project, with `lakefile.lean` at the root and a top-level `.lean` file re-exporting each module. The two principal modules are `Qdt/` (the elaborator and language server) and `Incremental/`, the build system framework, which is independent of the elaborator.
 
 #set par(justify: false)
 #set text(hyphenate: false)
@@ -19,8 +19,8 @@ The repository follows the standard structure of a Lean 4 project, with `lakefil
   [#num(metrics.rows.incremental)],
 
   [`Incremental/Shake/`],
-  [`Standard`, `Cancel`, `C`],
-  [Shake variants: pure Lean, cancellable, and FFI to the C version],
+  [`Standard`, `StandardRdeps`, `Cancel`, `C`],
+  [Shake variants: Lean, rdeps-augmented Lean, effectful, and C versions],
   [#num(metrics.rows.incremental_shake)],
 
   [`Incremental/Test/`],
@@ -45,7 +45,7 @@ The repository follows the standard structure of a Lean 4 project, with `lakefil
 
   [`Qdt/`],
   [`Bidirectional`, `Nbe`, `Conversion`],
-  [Bidirectional elaboration, normalisation by evaluation, conversion checking],
+  [Bidirectional type checking, normalisation by evaluation, conversion checking],
   [#num(metrics.rows.qdt)],
 
   [`Qdt/Incremental/`],
@@ -53,10 +53,7 @@ The repository follows the standard structure of a Lean 4 project, with `lakefil
   [Query types and elaboration task rules],
   [#num(metrics.rows.qdt_incremental)],
 
-  [`Qdt/Test/`],
-  [`Universes`, `Trunc`, `Quotient`],
-  [Inline elaborator tests via a `#pass` macro],
-  [#num(metrics.rows.qdt_test)],
+  [`Qdt/Test/`], [`Universes`, `Trunc`, `Quotient`], [Inline elaborator tests], [#num(metrics.rows.qdt_test)],
 
   [`Qdt/Lsp/`], [`Swap1`, `CrossFile`, `ImportCycle`], [Scripted edit session tests], [#num(metrics.rows.qdt_lsp)],
 
@@ -68,6 +65,8 @@ The repository follows the standard structure of a Lean 4 project, with `lakefil
   [#num(metrics.rows.examples_lean2hott)],
 
   [`examples/`], [`stdlib`, `long`], [Example code and synthetic benchmarks], [#num(metrics.rows.examples_other)],
+
+  [`bench/`], [`cold`, `incremental`, `conversion`, `variants`], [Benchmark drivers and conversion-checker variants], [#num(metrics.rows.bench)],
 
   [`.`], [`Main`, `Lsp`, `lakefile`], [CLI and LSP entry points; build config], [#num(metrics.rows.root)],
 )

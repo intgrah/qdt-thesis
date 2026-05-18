@@ -7,5 +7,4 @@ The elaborator is a single `Tasks` value (@sec:build-framework) whose queries de
 #include "04c-bidirectional.typ"
 #include "04d-nbe.typ"
 #include "04e-conversion.typ"
-#include "04f-inductive.typ"
 #include "04g-incremental.typ"

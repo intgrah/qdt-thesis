@@ -1,35 +1,12 @@
 === Conversion checking <sec:conv>
 
-#import "@preview/fletcher:0.5.8": diagram, edge, node
+Conversion is the hot loop of a dependent type checker. Every typing rule that crosses a definitional equality calls it, and most of those calls compare terms whose heads already agree. Forcing both sides to normal form just to discover this is wasteful. Kovács's smalltt @kovacs2023smalltt structures conversion as a three-mode gamble that pays only for the unfoldings it actually needs.
 
-Conversion checking decides definitional equality. The speculation-then-fallback strategy of @sec:nbe-theory is realised here as the three-mode algorithm of Kovacs's smalltt @kovacs2023smalltt:
+The default mode is *rigid*. When two glued values present the same defined head, rigid bets the spines will agree without forcing either body, and hands control to *flex*. Flex walks the spines and unfolds nothing; the first mismatch fails immediately, and rigid then enters *full*, where every definition is unfolded on encounter. Once full takes over a subterm it stays in full for that subterm's recursion. There is at most one backtrack: the cheap flex pass either succeeds and saves the unfolding cost, or fails after walking only as much of the spines as matched.
 
-- *Rigid*: the default. Two glued values with the same head trigger a speculative spine comparison in flex; on flex failure both sides are forced and compared in full.
-- *Flex*: entered from rigid's speculative check. No definitions are unfolded; no fallback. Any mismatch causes immediate failure, returning control to rigid.
-- *Full*: entered after a flex failure. All definitions are unfolded on encounter. Once in full, all recursive calls remain in full.
+Watching this on `Nat.add 2 3` against itself: both sides are glued at `Nat.add`, so rigid passes to flex. Flex walks the spines structurally --- `succ (succ zero)` against the same for the first argument, then `succ (succ (succ zero))` against the same for the second --- and reports agreement. `Nat.add`'s body is never fetched; no dependency on it is recorded.
 
-@fig:conv-states shows the transitions between these modes. At most one backtrack per subterm: rigid attempts a cheap flex check, and on failure commits to the expensive full check. Flex never unfolds, so the cost of a failed speculation is bounded by the matching prefix of the two spines.
+Compare `Nat.add 2 3` against `5`. The heads differ --- a glued definition on one side, a `Nat.succ` neutral on the other --- so flex cannot apply. Full takes over, forces the left through `whnf`, which $delta$-unfolds `Nat.add` and fires the recursor's $iota$-rule three times to land on `succ (succ (succ (succ (succ zero))))`, which is `5`. The check succeeds, but `Nat.add`'s body was read, so the build framework records the dependency.
 
-#figure(
-  diagram(
-    node-stroke: 0.6pt,
-    node-inset: 8pt,
-    spacing: (60pt, 40pt),
-
-    node((0, 0), [`rigid`], fill: rgb("#dce4f0"), name: <rigid>),
-    node((2, 0), [`flex`], fill: rgb("#e8dfd0"), name: <flex>),
-    node((0, 1), [`full`], fill: rgb("#e6d0c8"), name: <full>),
-
-    edge(<rigid>, <flex>, "->", label: [same head], label-side: left),
-    edge(<flex>, <full>, "->", label: [fail], label-side: left),
-    edge(<rigid>, <full>, "->", label: [heads differ], label-side: left),
-  ),
-  caption: [Conversion state transitions. ],
-) <fig:conv-states>
-
-Consider comparing `Nat.add 2 3` against `Nat.add 2 3`. Both sides are glued values with the same defined head `Nat.add`. Rigid enters flex speculatively. Flex compares the spines elementwise: the first arguments are both `Nat.succ (Nat.succ Nat.zero)`, same constructor head `Nat.succ`; recurse into the field, same again, down to `Nat.zero` on both sides. The second arguments match similarly. Flex succeeds. No definition body was fetched.
-
-Now comparing `Nat.add 2 3` against `5`. The heads differ: `Nat.add` is a defined constant appearing as a glued value, while `Nat.succ` is a constructor appearing as a neutral. Different heads skip flex and enter full mode. Full forces the glued value via `whnf`, which fetches `Nat.add`'s definition body and fires iota-reduction on the recursor three times, yielding `Nat.succ (Nat.succ (Nat.succ (Nat.succ (Nat.succ Nat.zero))))`. This matches `5`. The check succeeds, but `Nat.add`'s body was fetched, so a dependency is recorded.
-
-The checker also decides the two $eta$ rules of @sec:type-theory. For function $eta$, comparing a lambda against a non-lambda (or two lambdas) applies both sides to a fresh variable at the current de Bruijn level and compares the bodies, so `f` need not syntactically be a lambda. For structure $eta$, when one side is a constructor application $c(r_1, dots, r_k)$ of a single-constructor inductive and the other is an arbitrary term $s$, each projection $s.i$ is compared against the corresponding field $r_i$.
+The checker also handles the two $eta$ rules of @sec:type-theory. Function $eta$ fires when one side of a comparison is a $lambda$ and the other is any term: both sides are applied to a fresh variable at the current de Bruijn level and their bodies are compared, so $f$ is treated as a $lambda$ even when it is not syntactically one. Structure $eta$ fires when one side is a constructor application of a single-constructor inductive: each of the other side's projections is compared against the matching field, so $s$ and $sans("mk")(s.1, dots, s.k)$ are equated without forcing $s$ into constructor form.
 

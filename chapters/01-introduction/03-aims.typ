@@ -12,10 +12,12 @@ The core aims of this project correspond to the two success criteria of the prop
     #text(weight: 500, smallcaps[Core aims])
     #v(0.4em)
     #set enum(numbering: "(a)")
-    + to *elaborate* a dependent type theory with $Pi$ types, inductive types, universe polymorphism, structures, demonstrated on subsets of the Lean 2 HoTT port (@sec:correctness-eval), and
+    + to build an *elaborator* for a dependent type theory with $Pi$ types, inductive types, universe polymorphism, structures, demonstrated on subsets of the Lean 2 HoTT library (@sec:correctness-eval), and
     + to achieve *substantial speedup* of cached rebuilds against re-elaboration across a range of edit categories (@sec:incremental-eval).
   ],
 )
+
+#pagebreak()
 
 #block(
   width: 100%,
@@ -27,7 +29,7 @@ The core aims of this project correspond to the two success criteria of the prop
     #text(weight: 500, smallcaps[Extension aims])
     #v(0.4em)
     #set enum(numbering: "(a)")
-    + to *prove* in Lean 4 that every inhabitant of the polymorphic `Build` type produces the same result as a reference `compute` semantics defined by well-founded recursion (@sec:build-framework, @sec:build-inhabitants), with the verified core depending only on the axioms `propext` (propositional extensionality) and `Quot.sound` (soundness of quotient types) (@sec:correctness-eval), and
-    + to layer *effect-carrying extensions* (`ShakeTrace` for tracing, `ShakeCancel` for cancellation) that inherit the agreement proof _without_ revisiting it (@sec:effect-layers).
+    + to give *formally specified guarantees* about our underlying incremental system, in order to remove this aspect of our elaborator from the _trusted computing base_, in particular, to show that our elaborator is semantically identical to _batch elaboration_ (@sec:build-framework, @sec:build-inhabitants), and
+    + to *modularise* our code in such a way that extending our incremental system is _easy_ and can support the necessary features expected of modern tooling, such as _profiling_, _tracing_, and _language servers_. (@sec:effect-layers).
   ],
 )

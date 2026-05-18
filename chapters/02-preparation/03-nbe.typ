@@ -2,46 +2,50 @@
 
 == Normalisation by evaluation <sec:nbe-theory>
 
-Conversion calls from @sec:bidirectional-theory reduce terms to compare them. _Normalisation by evaluation_ (NbE) @abel2013normalization interprets terms into a _semantic domain_ of _values_. A $lambda$ becomes a _closure_, a body paired with the environment of its captured variables; a $beta$-step extends the environment with the argument's value, and the body is evaluated under the extended environment.
+Conversion calls from @sec:bidirectional-theory must reduce terms to compare them. A naive implementation would substitute syntactically on every $beta$-step, duplicating work whenever a substituted variable later reappears, and shifting de Bruijn indices across each binder. _Normalisation by evaluation_ (NbE) @abel2013normalization avoids both costs: it interprets terms into a _semantic_ domain of _values_ in which application is a meta-language operation, and substitution is replaced by environment lookup. Two functions complete the round trip:
 
-Two functions complete the round trip. _Evaluation_ takes a term and an environment to a value; _quotation_ (or _readback_) takes a value back to a term.
+$
+   sans("eval") & : sans("Term") times sans("Env") -> sans("Value") \
+  sans("quote") & : sans("Value") -> sans("Term")
+$
 
-A value is either _canonical_ ($lambda$, $Pi$, universe, or constructor) or _neutral_: a variable or recursor whose head is not yet reducible, applied to a _spine_ of arguments. Evaluation reduces to _weak head normal form_ (WHNF): the outermost constructor is decided, with reductions under binders deferred. Quotation descends into spines and forces closures under fresh binders. Conversion of two values is a structural walk: at canonicals of the same shape, recurse into subterms (entering closures with a fresh variable); at neutrals, compare heads and spines.
+Evaluation reduces a term to _weak head normal form_ (WHNF) under an environment $rho$ binding each free variable to a value. _Head_ means the outermost form is decided (canonical or stuck), and _weak_ means evaluation does not enter the bodies of $lambda$-binders, which stay packaged as closures, evaluated only when an argument arrives.
 
-Consider $(lambda x. f thin x) thin a$ at the empty environment, with $f$ a constant whose body is unavailable. The pieces of the term, drawn out in @fig:nbe-trace, end up in three different places: the binder $x$ joins the argument $a$ as an environment binding $x mapsto a$; the body $f thin x$ becomes the new focus; the lambda itself and the surrounding application are consumed. Continuing the WHNF of the body, the variable $x$ is looked up in the environment to yield $a$, and the head $f$, having no body to unfold, applies to $a$ to give the neutral value $f dot.c a$. Quotation reads this neutral back as the syntactic term $f thin a$.
+WHNF suffices for conversion: at matching canonical heads, the algorithm recurses into the subterms (forcing closures as needed); at neutrals, it compares head and spine. Quotation walks a value back to a term, descending into closures by applying them to a fresh variable.
 
-#figure(
-  {
-    import "@preview/fletcher:0.5.8": diagram, edge, node
+A value is either _canonical_ (a function $sans("lam")$, a type code $sans("pi'")$ or $sans("u'")$, or an inductive constructor applied to its arguments) or $sans("neutral")$: a stuck head $h$ (a free variable, or a constant whose body has not been unfolded) paired with a _spine_ $sigma$, a list of arguments and projections accumulated since the last reduction of the head. The canonical value of a lambda carries a _closure_ $chevron.l rho, t chevron.r$: the body $t$ paired with the environment $rho$ of its captured variables, not yet evaluated.
 
-    diagram(
-      node-stroke: none,
-      node-inset: 3pt,
-      spacing: (16pt, 18pt),
+Three rules give the character of evaluation:
 
-      node((-2.5, 1), [$lambda$], name: <l>),
-      node((-3.5, 2), [$x$], name: <x>),
-      node((-1.5, 2), [$f thin x$], name: <body>),
-      node((-0.5, 1), [$a$], name: <a>),
+$
+                sans("eval")(x_i, rho) & = rho(i) \
+  sans("eval")(lambda (x : A). t, rho) & = sans("lam")(x, sans("eval")(A, rho), chevron.l rho, t chevron.r) \
+           sans("eval")(t thin u, rho) & = sans("app")(sans("eval")(t, rho), sans("eval")(u, rho))
+$
 
-      edge(<l>, <x>, stroke: 0.4pt),
-      edge(<l>, <body>, stroke: 0.4pt),
+with the auxiliary $sans("app")$:
 
-      node((2.5, 1.2), [$x mapsto a$], name: <env>),
-      node((2.5, 2), [$f thin x$], name: <focus>),
-      node((1.4, 1.2), text(size: 0.85em)[env]),
-      node((1.4, 2), text(size: 0.85em)[focus]),
+$
+  sans("app")(sans("lam")(x, A, chevron.l rho, t chevron.r), v) & = sans("eval")(t, rho dot.c v) \
+                      sans("app")(sans("neutral")(h, sigma), v) & = sans("neutral")(h, sigma dot.c v)
+$
 
-      edge(<x>, <env>, "->", bend: 25deg),
-      edge(<a>, <env>, "->", bend: -10deg),
-      edge(<body>, <focus>, "->", bend: -10deg),
-    )
-  },
-  caption: [$(lambda x. thin f thin x) thin a$ taken apart by $beta$. The binder $x$ and the argument $a$ form the new environment binding; the body $f thin x$ becomes the new focus.],
-) <fig:nbe-trace>
+The closure case fires $beta$ inside the meta-language; the neutral case extends the spine without reducing. Quotation at a neutral reverses the spine back to a syntactic application; at a closure, it applies to a fresh variable and recurses under the binder.
 
-_Glued evaluation_ refines the algorithm for the case where the term being reduced names a defined constant. A definition introduced by `def c := body` makes $c$ definitionally equal to `body` by $delta$-reduction. A conversion checker that unfolds $delta$ eagerly pays the cost of normalising `body` on every encounter, even when the two sides being compared agree without ever needing `body`. _Glued_ evaluation @kovacs2024unfolding @kovacs2023smalltt avoids the eager cost. A constant $c$ evaluates to a pair of its _folded_ representation (the name $c$ and its universe arguments) and a thunk producing its unfolded value. Conversion compares folded forms first, on the speculation that two glued values with the same head and matching spines are equal. Only when the speculation fails does the checker force the thunk and try again.
+A defined constant evaluates to a _glued_ value, which carries the folded neutral (the constant applied to its universe arguments, empty spine) together with the constant's identifying information $(c, overline(ell))$ used to fetch and evaluate the body via $delta$-reduction when needed:
 
-Glued evaluation and the speculative conversion regime are due to Kovács's smalltt @kovacs2023smalltt @kovacs2024unfolding; qdt adopts both, and treats each forced thunk as the moment a cross-declaration dependency edge is recorded for the build system.
+$ sans("eval")(c.{overline(ell)}, rho) = sans("glued")(sans("neutral")(c.{overline(ell)}, epsilon), c, overline(ell)) $
 
-The glued representation gives the build system the hook it needs. Forcing $c$'s thunk is the moment the elaborator commits to depending on $c$'s body; the dependency edge is not declared in the source, only observed when conversion fires $delta$. @sec:conv describes the qdt implementation of this algorithm.
+Conversion compares two glued values' folded heads and spines first; when those agree, the bodies are not fetched. When they disagree, $sans("whnf")$ forces $delta$-reduction and conversion repeats on the unfolded values. We use glued evaluation for two reasons: the cheap-comparison-first discipline is due to Kovács's smalltt @kovacs2023smalltt @kovacs2024unfolding and is the practical performance argument; and each $delta$-reduction in $sans("whnf")$ is the elaborator's act of depending on $c$'s body, which the build framework records as a cross-declaration dependency edge (@sec:build-framework).
+
+To see evaluation on a small term, consider $(lambda x. f thin x) thin a$ at the empty environment, with $f$ a constant whose body is unavailable:
+
+$
+  sans("eval")((lambda x. f thin x) thin a, epsilon)
+  &= sans("app")(sans("lam")(x, "_", chevron.l epsilon, f thin x chevron.r), sans("eval")(a, epsilon)) \
+  &= sans("eval")(f thin x, epsilon dot.c a) \
+  &= sans("app")(sans("neutral")(f, epsilon), a) \
+  &= sans("neutral")(f, epsilon dot.c a)
+$
+
+Quotation reads this back as $f thin a$. @sec:conv describes our implementation.

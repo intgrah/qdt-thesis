@@ -33,7 +33,7 @@
 #heading(outlined: false, numbering: none, level: 2)[#smallcaps[Work completed]]
 
 #limited[
-  All success criteria were met and substantially exceeded. The elaborator type-checks an expressive dependent type theory, capable of elaborating the Lean 2 HoTT library. /* TODO Qualify with "subset" or not? Lean 2-hott exponential blowup */ Incremental re-elaboration takes time proportional to the edit, independent of project size. Beyond the proposal, a machine-checked correctness proof for the build system underlying the elaborator was established in Lean 4 against a reference batch semantics, extending without modification to effectful variants.
+  All success criteria were met and substantially exceeded. The elaborator type-checks an expressive dependent type theory, capable of elaborating code from the Lean 2 HoTT library. Incremental re-elaboration takes time proportional to the edit, independent of project size. Beyond the proposal, a machine-checked correctness proof for the build system underlying the elaborator was established in Lean 4 against a reference batch semantics, extending without modification to effectful variants.
 ]
 
 #heading(outlined: false, numbering: none, level: 2)[#smallcaps[Special difficulties]]

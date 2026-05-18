@@ -2,6 +2,35 @@
 
 #let metrics = json("metrics.json")
 
+#let diff(..lines) = block(
+  fill: luma(248),
+  inset: (x: 0pt, y: 6pt),
+  radius: 3pt,
+  width: 100%,
+  stack(
+    spacing: 0pt,
+    ..lines
+      .pos()
+      .map(line => {
+        let kind = line.at(0)
+        let content = line.at(1)
+        let bg = if kind == "-" {
+          rgb("#fbd6d6")
+        } else if kind == "+" {
+          rgb("#d6f1d6")
+        } else {
+          none
+        }
+        block(
+          width: 100%,
+          fill: bg,
+          inset: (left: 8pt, right: 8pt, top: 3pt, bottom: 3pt),
+          align(left, raw(kind + " " + content, lang: "lean")),
+        )
+      }),
+  ),
+)
+
 #let project(
   title: "My Dissertation",
   author: "<Insert name>",
@@ -45,7 +74,6 @@
   show heading: it => {
     if it.level == 1 {
       pagebreak()
-      v(4.5em)
       block(below: 2em, {
         if it.numbering == "1.1" {
           text(size: 60pt, weight: 400, fill: slate, context {

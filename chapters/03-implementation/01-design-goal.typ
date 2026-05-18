@@ -1,18 +1,18 @@
 == Design goal <sec:design-goal>
 
-@sec:requires identified four obligations a build framework must support to admit a machine-checked agreement theorem: dependent result types, well-foundedness, structural parametricity carried on tasks, and effect orthogonality. This chapter constructs a framework that satisfies them, instantiates it with three caching strategies, and wires the elaborator into it.
+A machine-checked agreement theorem between cached and batch elaboration requires the four properties of @sec:requires. This chapter constructs a framework that satisfies them, instantiates it with three caching strategies, and wires the elaborator into it.
 
 The construction proceeds in four steps. @sec:build-framework defines the `Build` interface and the `compute` reference semantics that every inhabitant must agree with, with the parametricity certificate carried as a field of `Task`. @sec:build-inhabitants exhibits three inhabitants: `Busy` runs `compute` directly, `LessBusy` adds within-build memoisation, and `Shake` adds cross-build persistence with verifying traces. Two effect-layer extensions, `ShakeTrace` and `ShakeCancel`, are derived from `Shake` without revisiting the agreement proof. @sec:elaborator presents the elaborator as a single `Tasks` value, independent of which inhabitant executes it, and records the constants the conversion checker unfolds so that invalidation is keyed on actual dependencies rather than file boundaries. @sec:lsp wraps the executor for editor interaction.
 
 #import "@preview/fletcher:0.5.8": diagram, edge, node
 
 #figure(
-  diagram(
+  scale(85%, reflow: true, diagram(
     node-stroke: 0.5pt,
     node-fill: rgb("#dce4f0"),
-    node-inset: 6pt,
-    spacing: (40pt, 30pt),
-    mark-scale: 120%,
+    node-inset: 5pt,
+    spacing: (30pt, 22pt),
+    mark-scale: 100%,
 
     node((0, 0), [Source text], fill: rgb("#eaeaea"), name: <src>),
     node((1, 0), [Source positions], fill: rgb("#f0dede"), name: <pos>),
@@ -51,7 +51,7 @@ The construction proceeds in four steps. @sec:build-framework defines the `Build
     edge(<diag>, <pos>, "->"),
 
     edge(<hover>, <tyinfo>, "->"),
-  ),
+  )),
   caption: [
     Elaboration pipeline. Source text is parsed to a CST, then lowered to an AST and a source map between CST and AST paths. The type checker produces core terms and emits diagnostics keyed by AST paths. Diagnostics are mapped through the source map to recover source positions.
   ],

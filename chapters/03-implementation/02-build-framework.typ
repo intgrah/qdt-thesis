@@ -1,6 +1,6 @@
 == The build framework <sec:build-framework>
 
-The build framework is a Lean 4 formalisation of the polymorphic Task type @mokhov2018build, extended with the four properties identified in @sec:requires: dependent result types, well-foundedness, structural parametricity on tasks, and effect orthogonality. This section defines the type and its reference semantics; @sec:build-inhabitants presents the cached executors that inhabit it.
+This section presents the Lean 4 formalisation that adds the four properties of @sec:requires. Dependent result types and structural parametricity are carried in the framework's representation; well-foundedness lives in a separate reference semantics; effect orthogonality is achieved by stacking effect layers around a proof-relevant payload. Cross-build persistence follows the verifying-trace design of Shake @mitchell2012shake. @sec:build-inhabitants presents the cached executors that inhabit the framework.
 
 === Setup
 
@@ -22,9 +22,9 @@ An input store is a value `J` with a typeclass providing `get` and `set` operati
 
 === Task
 
-A task specifies how to produce one query's result. It consumes inputs and dependencies (any query `q` strictly preceding `q₀` under `ℭ.rel`) and returns a value of the target type. A task is described once and runs under any monad: pure recomputation under `Id`, a stateful build under `StateM Cache`, a cancellable build under `CancelM Cache` (which unfolds to `ReaderT (BaseIO Bool) (ExceptT Cancelled (StateT Cache BaseIO))`). Caching, scheduling, and execution order are the responsibility of inhabitants of `Build`, not of the task.
+A task specifies how to produce one query's result. It consumes inputs and dependencies (any query `q` strictly preceding `q₀` under `ℭ.rel`) and returns a value of the target type. A task is described once and runs under any monad: pure recomputation under `Id`, a stateful build under `StateM Cache`, a cancellable build under `CancelM Cache`.#footnote[This unfolds to `ReaderT (BaseIO Bool) (ExceptT Cancelled (StateT Cache BaseIO))`, that is, a monad with the capability to read a boolean flag from another thread, possibly returning failure if cancelled, but always returning an updated cache.]. Caching, scheduling, and execution order are the responsibility of inhabitants of `Build`, rather than the task.
 
-A task is polymorphic over its effect monad, so two instantiations agree on related handlers: this is the free theorem @wadler1989theorems for the type of `fn`. In Haskell the theorem comes for free; in Lean it does not, since a polymorphic term may inspect its type argument through typeclass dispatch. Each task pays the fee at construction by carrying a relational certificate, quantified over a _monad action_ @voigtlander2009free. Voigtländer introduced monad actions in 2009 as the device for binary parametricity at a type constructor of higher kind: a relation lifter between two monads preserving `pure` and `>>=`. Lean's logic does not derive the free theorem for monad-polymorphic terms internally, so qdt exposes the relational obligation as data, with each task carrying a constructive proof against this interface:
+A task is polymorphic over its effect monad as in BSALC's published Task, so that different build systems may instantiate it with different `f`. Wadler's metatheorem @wadler1989theorems says any polymorphic term's two instantiations agree on related handlers; Haskellians appeal to this informally as a property of the type. Lean's logic does not derive such metatheorems internally, because a polymorphic Lean term may inspect its type argument through typeclass dispatch. To use the fact inside a Lean proof, each task carries a relational certificate at construction. The certificate is quantified over a _monad action_ @voigtlander2009free, the device Voigtländer introduced in 2009 for binary parametricity at a type constructor of higher kind: a relation lifter between two monads preserving `pure` and `>>=`. The framework exposes the relational obligation as data, with each task carrying a constructive proof against this interface:
 
 ```lean
 structure MonadAction (κ₁ κ₂ : Type → Type) [Monad κ₁] [Monad κ₂] where
@@ -36,7 +36,7 @@ structure MonadAction (κ₁ κ₂ : Type → Type) [Monad κ₁] [Monad κ₂] 
 
 `rel` sends a value relation `R : α → β → Prop` to a computation relation `rel R : κ₁ α → κ₂ β → Prop`. The two laws require that pure values from related inputs are related, and that binds preserve relatedness over pointwise-related continuations.
 
-A `Task ℭ q₀ α` then bundles a polymorphic computation `fn` with the certificate `param`:
+A `Task ℭ q₀ α` then bundles a _polymorphic computation_ `fn` with the certificate `param`:
 
 ```lean
 structure Task (ℭ : BuildConfig) (q₀ : ℭ.Q) (α : Type) : Type 1 where
@@ -76,7 +76,7 @@ structure Value (tasks : Tasks ℭ) (ι : ∀ i, ℭ.V i) (q : ℭ.Q) where
   spec : val = compute tasks ι q
 ```
 
-`Build` is the interface every cached executor implements. The state `σ` advances as the build runs; the outer monad `n` carries execution effects; the inner `m` is a free monad for tracing or cancellation. Correctness is independent of `n` and `m`, holding via the `spec` field of `Value`.
+`Build` is the interface every cached executor implements. The state `σ` advances as the build runs; the outer monad `n` carries execution effects; the inner `m` is a monad for tracing or cancellation. Correctness is independent of `n` and `m`, holding via the `spec` field of `Value`.
 
 ```lean
 structure Build (ℭ : BuildConfig) (J : Type) [Input ℭ J] (tasks : Tasks ℭ)

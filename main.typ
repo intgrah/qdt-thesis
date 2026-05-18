@@ -53,6 +53,6 @@
   #counter(heading).update(0)
 
   #include "chapters/06-appendix/proofs.typ"
-  #include "chapters/06-appendix/bench.typ"
+  #include "chapters/06-appendix/proofs-rdeps.typ"
   #include "chapters/06-appendix/proposal.typ"
 ]<appendix>
